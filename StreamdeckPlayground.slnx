@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StreamdeckPlayground.Shared/StreamdeckPlayground.Shared.csproj" />
+    <Project Path="src/StreamdeckPlayground.Web/StreamdeckPlayground.Web.csproj" />
+  </Folder>
+</Solution>

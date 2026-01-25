@@ -1,0 +1,159 @@
+﻿@page "/"
+@using StreamdeckPlayground.Shared
+@using StreamdeckPlayground.Web.Services
+@inject ProgressService ProgressService
+@rendermode InteractiveServer
+
+<PageTitle>Stream Deck Progress Control</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h1 class="text-center mb-4">Stream Deck Progress Control</h1>
+            
+            <!-- Progress Information -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Current Progress</h5>
+                    <p class="card-text">
+                        Step: <strong>@currentState.Step</strong> / @currentState.Max
+                        <span class="text-muted ms-3">(@currentState.Percent%)</span>
+                    </p>
+                    
+                    <!-- Progress Bar -->
+                    <!-- 
+                        The progress bar visually represents the current step.
+                        We use Bootstrap's progress bar component with dynamic width.
+                        Width is calculated as a percentage (0% to 100%).
+                    -->
+                    <div class="progress" style="height: 40px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" 
+                             style="width: @currentState.Percent%"
+                             aria-valuenow="@currentState.Step" 
+                             aria-valuemin="0" 
+                             aria-valuemax="@currentState.Max">
+                            @currentState.Percent%
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <!-- 
+                    Decrease Button: Reduces progress by 1 step (1/8)
+                    Disabled when at 0% to prevent going negative
+                -->
+                <button class="btn btn-danger btn-lg" 
+                        @onclick="OnDecreaseClicked"
+                        disabled="@(currentState.Step == 0)">
+                    <i class="bi bi-dash-circle"></i> Decrease (-1 step)
+                </button>
+
+                <!-- 
+                    Increase Button: Increases progress by 1 step (1/8)
+                    Disabled when at 100% to prevent exceeding maximum
+                -->
+                <button class="btn btn-success btn-lg" 
+                        @onclick="OnIncreaseClicked"
+                        disabled="@(currentState.Step == currentState.Max)">
+                    <i class="bi bi-plus-circle"></i> Increase (+1 step)
+                </button>
+            </div>
+
+            <!-- API Information -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">REST API Endpoints</h5>
+                    <p class="card-text">
+                        These buttons also update the progress via the ProgressService,
+                        which is the same service used by the REST API endpoints.
+                    </p>
+                    <ul class="list-unstyled">
+                        <li><code>GET /api/progress</code> - Get current state</li>
+                        <li><code>POST /api/progress/inc</code> - Increment by 1 step</li>
+                        <li><code>POST /api/progress/dec</code> - Decrement by 1 step</li>
+                        <li><code>PUT /api/progress/{'{step}'}</code> - Set to specific step (0-8)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    // Store the current state for display
+    // Updated whenever the ProgressService state changes
+    private ProgressState currentState = new ProgressState(0, ProgressService.MaxSteps);
+
+    /// <summary>
+    /// Component initialization - get initial state and subscribe to changes.
+    /// </summary>
+    /// <remarks>
+    /// OnInitialized runs when the component first loads.
+    /// We subscribe to the ProgressChanged event so the UI updates
+    /// when other clients (REST API, Stream Deck) modify the progress.
+    /// </remarks>
+    protected override void OnInitialized()
+    {
+        // Get the initial state
+        currentState = ProgressService.GetState();
+
+        // Subscribe to state changes
+        // This ensures the UI updates even when changes come from the API
+        ProgressService.ProgressChanged += OnProgressChanged;
+    }
+
+    /// <summary>
+    /// Handles the Increase button click.
+    /// Calls the ProgressService to increment by one step.
+    /// </summary>
+    private void OnIncreaseClicked()
+    {
+        currentState = ProgressService.Increment();
+        // Note: StateHasChanged() is called automatically by Blazor after event handlers
+        // But we call it explicitly here to ensure immediate UI update
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Handles the Decrease button click.
+    /// Calls the ProgressService to decrement by one step.
+    /// </summary>
+    private void OnDecreaseClicked()
+    {
+        currentState = ProgressService.Decrement();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Event handler for ProgressService.ProgressChanged event.
+    /// Updates the UI when progress changes from external sources (API calls).
+    /// </summary>
+    /// <remarks>
+    /// This is important for synchronization:
+    /// - If the Stream Deck client calls the REST API to change progress
+    /// - Or if someone uses curl/Postman to modify progress
+    /// - This UI will automatically update to reflect the change
+    /// 
+    /// InvokeAsync is used because the event may fire from a different thread.
+    /// StateHasChanged tells Blazor to re-render the component.
+    /// </remarks>
+    private void OnProgressChanged(object? sender, ProgressState newState)
+    {
+        InvokeAsync(() =>
+        {
+            currentState = newState;
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Component disposal - unsubscribe from events to prevent memory leaks.
+    /// </summary>
+    public void Dispose()
+    {
+        ProgressService.ProgressChanged -= OnProgressChanged;
+    }
+}
