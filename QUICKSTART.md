@@ -173,6 +173,33 @@ If all steps worked, you've confirmed:
 
 ## Common Issues
 
+### Console Window Flashes and Closes Immediately
+
+**Problem:** StreamDeckClient console opens and closes immediately
+
+**Causes & Solutions:**
+
+1. **Missing configuration file:**
+   ```bash
+   # Rebuild the project to ensure appsettings.json is copied
+   cd src/StreamdeckPlayground.StreamDeckClient
+   dotnet build
+   dotnet run
+   ```
+
+2. **Running from wrong directory:**
+   - Make sure you're in the `src/StreamdeckPlayground.StreamDeckClient` directory
+   - Or use: `dotnet run --project src/StreamdeckPlayground.StreamDeckClient/StreamdeckPlayground.StreamDeckClient.csproj`
+
+3. **Running the DLL directly:**
+   - Don't run the .dll file directly from File Explorer
+   - Use `dotnet run` from the command line instead
+
+4. **See the error message:**
+   - Run from command prompt/terminal (not by double-clicking)
+   - The console will stay open and show the error
+   - Error messages now wait for you to press a key
+
 ### Port Already in Use
 
 **Problem:** Web app says "Failed to bind to address"
