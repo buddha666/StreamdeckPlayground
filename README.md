@@ -38,21 +38,27 @@ StreamdeckPlayground/
 │   │   │   └── ProgressController.cs         # REST API endpoints
 │   │   └── Components/Pages/
 │   │       └── Home.razor                    # Main UI page
-│   └── StreamdeckPlayground.StreamDeckClient/ # Stream Deck console client
-│       ├── Services/
-│       │   ├── ProgressApiClient.cs          # REST API client
-│       │   ├── ImageGenerator.cs             # Key image generation
-│       │   └── StreamDeckController.cs       # Stream Deck integration
-│       ├── Configuration/
-│       │   └── AppSettings.cs                # Configuration models
-│       ├── appsettings.json                  # Configuration file
-│       └── Program.cs                        # Application entry point
+│   ├── StreamdeckPlayground.StreamDeckClient/ # Stream Deck console client
+│   │   ├── Services/
+│   │   │   ├── ProgressApiClient.cs          # REST API client
+│   │   │   ├── ImageGenerator.cs             # Key image generation
+│   │   │   └── StreamDeckController.cs       # Stream Deck integration
+│   │   ├── Configuration/
+│   │   │   └── AppSettings.cs                # Configuration models
+│   │   ├── appsettings.json                  # Configuration file
+│   │   └── Program.cs                        # Application entry point
+│   └── StreamdeckPlayground.StreamDeckService/ # Windows Service (skeleton)
+│       ├── Worker.cs                         # Background worker
+│       ├── Program.cs                        # Service entry point
+│       └── README.md                         # Service documentation
 ├── README.md                                 # This file
 ├── .editorconfig                             # Code style configuration
 └── StreamdeckPlayground.slnx                 # Solution file
 ```
 
 ## 🚀 Quick Start
+
+> **📘 New here?** Check out [QUICKSTART.md](QUICKSTART.md) for a step-by-step guide to verify everything works!
 
 ### 1. Clone the Repository
 
@@ -234,6 +240,16 @@ Runtime image creation using SixLabors.ImageSharp:
 - **Mini progress bars** for control buttons
 - **Symbols** (+ and -) for visual clarity
 - **BMP format** for fast encoding
+
+### Windows Service (Optional)
+
+The solution includes a skeleton Windows Service project (`StreamdeckPlayground.StreamDeckService`) that demonstrates how to run the Stream Deck client as a background service. This is **disabled by default** and serves as a learning template.
+
+**See**: `src/StreamdeckPlayground.StreamDeckService/README.md` for detailed instructions on:
+- Enabling the service
+- Installation and configuration
+- Running as a Windows Service
+- Troubleshooting service-specific issues
 
 ## 🔧 Troubleshooting
 
