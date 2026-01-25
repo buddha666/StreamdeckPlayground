@@ -275,6 +275,24 @@ The solution includes a skeleton Windows Service project (`StreamdeckPlayground.
 4. Check firewall settings
 5. Ensure correct port number (default: 5000)
 
+### Type Initialization Exception / Missing Method
+
+**Symptoms**: Error like `System.TypeInitializationException` or `Method not found: 'Void SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder.set_Quality'`
+
+**Cause**: Package version incompatibility between StreamDeckSharp and SixLabors.ImageSharp
+
+**Solutions**:
+1. Ensure you have the correct package versions:
+   - `SixLabors.ImageSharp` = 2.1.11 (not 3.x)
+   - `SixLabors.ImageSharp.Drawing` = 1.0.0-beta15 (not 2.x)
+   - `StreamDeckSharp` = 6.1.0
+2. Delete `bin` and `obj` folders, then rebuild:
+   ```bash
+   cd src/StreamdeckPlayground.StreamDeckClient
+   rm -rf bin obj
+   dotnet build
+   ```
+
 ### Image Display Issues
 
 **Symptoms**: Black keys or incorrect images

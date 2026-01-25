@@ -90,9 +90,18 @@ Successfully implemented a complete, production-ready, learning-focused solution
 - **.NET 8.0** - Latest LTS framework
 - **Blazor Server** - Server-side web UI framework
 - **ASP.NET Core** - Web API and middleware
-- **StreamDeckSharp** - Stream Deck hardware library
-- **SixLabors.ImageSharp** - Cross-platform image processing
+- **StreamDeckSharp 6.1.0** - Stream Deck hardware library
+- **SixLabors.ImageSharp 2.1.11** - Cross-platform image processing (pinned for compatibility)
+- **SixLabors.ImageSharp.Drawing 1.0.0-beta15** - Drawing extensions (compatible with ImageSharp 2.1.x)
 - **Microsoft.Extensions.*** - Configuration, DI, Logging, Hosting
+
+### Important Version Notes
+
+**Package Compatibility:**
+- StreamDeckSharp 6.1.0 requires SixLabors.ImageSharp 2.1.x (not 3.x)
+- ImageSharp.Drawing 2.1.7+ requires ImageSharp 3.x, which is incompatible
+- Solution uses ImageSharp.Drawing 1.0.0-beta15 for compatibility
+- ImageSharp is explicitly pinned to 2.1.11 to prevent automatic upgrades
 
 ## Documentation
 
