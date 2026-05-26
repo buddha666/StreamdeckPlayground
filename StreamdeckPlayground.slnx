@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="../../TFS/COLOSSEO/apps/StreamDeck.Client/Colosseo.StreamDeckClient.csproj" />
+    <Project Path="src/Colosseo.StreamDeckClient/Colosseo.StreamDeckClient.csproj" />
     <Project Path="src/StreamdeckPlayground.Shared/StreamdeckPlayground.Shared.csproj" />
     <Project Path="src/StreamdeckPlayground.StreamDeckClient/StreamdeckPlayground.StreamDeckClient.csproj" />
     <Project Path="src/StreamdeckPlayground.StreamDeckService/StreamdeckPlayground.StreamDeckService.csproj" />

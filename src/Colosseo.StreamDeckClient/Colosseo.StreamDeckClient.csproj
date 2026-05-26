@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\ProjectDefinitions\Constants.csprojimport" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <OutputPath>..\..\Assemblies\Apps\Colosseo.StreamDeckClient\</OutputPath>
+    <TargetFrameworks>$(DotNetWindowsVersion)</TargetFrameworks>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
+    <PackageReference Include="SixLabors.Fonts" Version="1.0.0-beta18" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.11" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta15" />
+    <PackageReference Include="StreamDeckSharp" Version="6.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\apps\ShowManager\ODataClient.Flow\ODataClient.Flow.csproj" />
+  </ItemGroup>
+
+</Project>
