@@ -1,4 +1,4 @@
-﻿using Colosseo.StreamDeckClient.Data;
+using Colosseo.StreamDeckClient.Data;
 using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
@@ -68,7 +68,6 @@ public sealed class StreamDeckRuntime
         await RefreshCurrentPageIfNeededAsync(force: false, ct);
 
         await _renderer.RenderAsync(_nav.Current, _nav.CanGoBack, ct);
-        _nav.Current.ClearDirty();
 
         LogAliveSometimes();
 

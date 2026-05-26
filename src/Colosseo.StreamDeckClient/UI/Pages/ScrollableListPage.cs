@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -157,15 +157,17 @@ public abstract class ScrollableListPage
       _dirtyKeys.Add(i);
   }
 
-  public void ClearDirty()
-  {
-    lock (_sync)
+    public int[] TakeAndClearDirtyKeys()
     {
-      _dirtyKeys.Clear();
+        lock (_sync)
+        {
+            var keys = _dirtyKeys.ToArray();
+            _dirtyKeys.Clear();
+            return keys;
+        }
     }
-  }
 
-  public async Task OnKeyDownAsync(int keyIndex, CancellationToken ct)
+    public async Task OnKeyDownAsync(int keyIndex, CancellationToken ct)
   {
     if (keyIndex == KeyScrollUp) { ScrollUp(); return; }
     if (keyIndex == KeyScrollDown) { ScrollDown(); return; }
