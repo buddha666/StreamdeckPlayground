@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -165,9 +165,7 @@ public abstract class ScrollableListPage
   }
 
   /// <summary>
-  /// Atomically snapshots and clears the dirty-key set. Use this in the renderer
-  /// instead of reading DirtyKeys and later calling ClearDirty(), to avoid losing
-  /// dirty flags that background threads add while the renderer is running.
+  /// Atomically snapshots and clears the dirty-key set.
   /// </summary>
   public int[] TakeAndClearDirtyKeys()
   {
@@ -208,6 +206,16 @@ public abstract class ScrollableListPage
     lock (_sync)
     {
       _dirtyKeys.Clear();
+    }
+  }
+
+  public int[] TakeAndClearDirtyKeys()
+  {
+    lock (_sync)
+    {
+      var keys = _dirtyKeys.ToArray();
+      _dirtyKeys.Clear();
+      return keys;
     }
   }
 

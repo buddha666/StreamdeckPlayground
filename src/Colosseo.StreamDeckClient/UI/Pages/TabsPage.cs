@@ -59,12 +59,13 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
     {
       var accent = ColorUtil.FromFlowColor(t.Color, Color.Black);
       return new ListItem(
-          id: t.Id.ToString(),
-          title: t.Name,
-          accentColor: accent,
-          kind: ListItemKind.Tab,
-          badgeCount: null,
-          isThumbnailLoading: false
+                    id: t.Id.ToString(),
+                    title: t.Name,
+                    accentColor: accent,
+                    kind: ListItemKind.Tab,
+                    badgeCount: null,
+                    isThumbnailLoading: false,
+                    isQuickTab: t.IsQuick
       );
     }).ToList();
 

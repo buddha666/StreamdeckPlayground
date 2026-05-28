@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
+using Monogram.Sport.FlowBLL.Enums;
 
 namespace Colosseo.StreamDeckClient.Data;
 
@@ -108,19 +109,18 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
     }
   }
 
-  public async Task HideOsdAsync(SystemEventTypeCode osdType, CancellationToken ct)
+  public async Task StopAction(CancellationToken ct)
   {
     ct.ThrowIfCancellationRequested();
 
-    // NOTE: Adjust the provider call to match the actual IFlowControlProvider API.
-    await _flowControlProvider.HideOsdAsync(osdType, _cfg.FlowSenderIdentifier);
+    await _flowControlProvider.StopActiveEventAsync(EventTypeCode.OneTimeEvent, null);
   }
 
-  public async Task StopActionAsync(CancellationToken ct)
+  public async Task HideOsd(SystemEventTypeCode systemEventTypeCode, CancellationToken ct)
   {
     ct.ThrowIfCancellationRequested();
 
-    // NOTE: Adjust the provider call to match the actual IFlowControlProvider API.
-    await _flowControlProvider.StopActionAsync(_cfg.FlowSenderIdentifier);
+    await _flowControlProvider.StopActiveEventAsync(EventTypeCode.System, systemEventTypeCode);
   }
+
 }

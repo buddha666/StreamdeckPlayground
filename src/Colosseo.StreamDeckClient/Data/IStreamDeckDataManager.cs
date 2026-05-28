@@ -1,4 +1,4 @@
-﻿using Colosseo.Flow.Domain.DomainClasses;
+using Colosseo.Flow.Domain.DomainClasses;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -33,6 +33,6 @@ public interface IStreamDeckDataManager
   Task PlayCompositeTabEventLive(int idEvent, CancellationToken ct);
   Task<Stream> GetTabEventThumbnailAsync(int eventId, CancellationToken ct);
 
-  Task HideOsdAsync(SystemEventTypeCode osdType, CancellationToken ct);
-  Task StopActionAsync(CancellationToken ct);
+  Task HideOsd(SystemEventTypeCode osdType, CancellationToken ct);
+  Task StopAction(CancellationToken ct);
 }

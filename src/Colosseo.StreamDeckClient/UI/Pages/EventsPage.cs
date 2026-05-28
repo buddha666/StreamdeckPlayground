@@ -93,7 +93,10 @@ public sealed class EventsPage : ScrollableListPage, IRefreshablePage
           badgeCount: badge,
           kind: isComposite ? ListItemKind.EventComposite : ListItemKind.EventSingle,
           thumbnailBytes: null,
-          isThumbnailLoading: true
+          isThumbnailLoading: true,
+          isQuickTab: false,
+          positionX: e.PositionY,
+          positionY: e.PositionX
       ));
 
       thumbRequests.Add((i, thumbEventId));
@@ -105,7 +108,7 @@ public sealed class EventsPage : ScrollableListPage, IRefreshablePage
     // ---- phase 2: fetch thumbnails in background, update items progressively ----
     _ = Task.Run(async () =>
     {
-      // limit parallelism so you don't DDOS your endpoint
+      // limit parallelism so you don't DDOS
       using var gate = new SemaphoreSlim(4);
       var tasks = new List<Task>(thumbRequests.Count);
 
@@ -130,7 +133,10 @@ public sealed class EventsPage : ScrollableListPage, IRefreshablePage
                 badgeCount: old.BadgeCount,
                 kind: old.Kind,
                 thumbnailBytes: hasThumbnail ? thumbBytes : null,
-                isThumbnailLoading: false // IMPORTANT: loading finished (either we got bytes or we know there isn't any)
+                isThumbnailLoading: false, // IMPORTANT: loading finished (either we got bytes or we know there isn't any)
+                isQuickTab: old.IsQuickTab,
+                positionX: old.PositionX,
+                positionY: old.PositionY
             );
 
             SetItems(items);

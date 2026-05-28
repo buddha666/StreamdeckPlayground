@@ -1,4 +1,4 @@
-﻿using Colosseo.Flow.Domain.DomainClasses;
+using Colosseo.Flow.Domain.DomainClasses;
 using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
 using Colosseo.StreamDeckClient.Rendering;
@@ -208,16 +208,16 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         await _data.PlayCompositeTabEventLive(ParseEventId(item.Id), ct);
         break;
       case ListItemKind.StopOsdTop:
-        await _data.HideOsdAsync(SystemEventTypeCode.OsdTop, ct);
+        await _data.HideOsd(SystemEventTypeCode.OsdTop, ct);
         break;
       case ListItemKind.StopOsdMiddle:
-        await _data.HideOsdAsync(SystemEventTypeCode.OsdMiddle, ct);
+        await _data.HideOsd(SystemEventTypeCode.OsdMiddle, ct);
         break;
       case ListItemKind.StopOsdBottom:
-        await _data.HideOsdAsync(SystemEventTypeCode.OsdBottom, ct);
+        await _data.HideOsd(SystemEventTypeCode.OsdBottom, ct);
         break;
       case ListItemKind.StopAllActions:
-        await _data.StopActionAsync(ct);
+        await _data.StopAction(ct);
         break;
     }
   }

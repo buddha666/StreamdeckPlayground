@@ -93,6 +93,7 @@ public sealed class StreamDeckRuntime
 
       try
       {
+        // IMPORTANT: clear even when ct is canceled
         await _device.ClearAsync(CancellationToken.None);
       }
       catch { }

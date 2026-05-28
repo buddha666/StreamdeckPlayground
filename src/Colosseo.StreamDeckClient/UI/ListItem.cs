@@ -11,10 +11,19 @@ public sealed class ListItem
   public byte[] ThumbnailBytes { get; }
   public bool IsEvent => Kind is ListItemKind.EventSingle or ListItemKind.EventComposite;
   public ListItemKind Kind { get; set; }
-
   public bool IsThumbnailLoading { get; }
+  public bool IsQuickTab { get; set; }
+  /// <summary>
+  /// TOP LEFT = 0, Incremento to the right
+  /// </summary>
+  public int PositionX { get; set; }
 
-  public ListItem(string id, string title, DrawingColor? accentColor, int? badgeCount, ListItemKind kind, bool isThumbnailLoading, byte[] thumbnailBytes = null)
+  /// <summary>
+  /// TOP LEFT = 0, Increment to the down
+  /// </summary>
+  public int PositionY { get; set; }
+
+  public ListItem(string id, string title, DrawingColor? accentColor, int? badgeCount, ListItemKind kind, bool isThumbnailLoading, byte[] thumbnailBytes = null, bool isQuickTab = false, int positionX = 0, int positionY = 0)
   {
     Id = id;
     Title = title;
@@ -23,5 +32,8 @@ public sealed class ListItem
     ThumbnailBytes = thumbnailBytes;
     Kind = kind;
     IsThumbnailLoading = isThumbnailLoading;
+    IsQuickTab = isQuickTab;
+    PositionX = positionX;
+    PositionY = positionY;
   }
 }
