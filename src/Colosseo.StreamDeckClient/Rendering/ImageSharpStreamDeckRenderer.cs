@@ -151,7 +151,7 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
         continue;
       }
 
-      ListItem? item;
+      ListItem item;
       try
       {
         if (!page.TryGetItem(itemIndex.Value, out item))
