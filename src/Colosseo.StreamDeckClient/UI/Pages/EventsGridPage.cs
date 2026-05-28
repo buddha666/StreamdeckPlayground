@@ -96,17 +96,19 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
     {
       foreach (var qe in quickEvents)
       {
-        if (qe.PositionY < 0 || qe.PositionY >= Rows) continue;
-        int ki = qe.PositionY * Columns + QuickCol;
-        slots[ki] = BuildEventItem(qe, loadingThumb: true);
+        var item = BuildEventItem(qe, loadingThumb: true, isQuickTab: true);
+        if (item.PositionX < 0 || item.PositionX >= Rows) continue;
+        int ki = item.PositionX * Columns + QuickCol;
+        slots[ki] = item;
       }
     }
 
     // --- regular events ---
     foreach (var e in events)
     {
-      int x = e.PositionX;
-      int y = e.PositionY;
+      var item = BuildEventItem(e, loadingThumb: true);
+      int x = item.PositionX;
+      int y = item.PositionY;
 
       if (x < 0 || x > MaxEventCol) continue;   // outside allowed event area
       if (y < 0 || y >= Rows) continue;
@@ -115,7 +117,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
       if (ki == KeyBack) continue;               // reserved for BACK
       if (slots[ki] != null) continue;           // occupied by stop/quick column
 
-      slots[ki] = BuildEventItem(e, loadingThumb: true);
+      slots[ki] = item;
     }
 
     // Publish initial state (all items show "loading" for thumbnails)
@@ -156,7 +158,10 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                 badgeCount: capturedItem.BadgeCount,
                 kind: capturedItem.Kind,
                 thumbnailBytes: thumbBytes is { Length: > 0 } ? thumbBytes : null,
-                isThumbnailLoading: false
+                isThumbnailLoading: false,
+                isQuickTab: capturedItem.IsQuickTab,
+                positionX: capturedItem.PositionX,
+                positionY: capturedItem.PositionY
             );
 
             lock (_slots) { _slots[capturedKi] = updated; }
@@ -239,7 +244,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
           isThumbnailLoading: false
       );
 
-  private static ListItem BuildEventItem(ITabEventBase e, bool loadingThumb)
+  private static ListItem BuildEventItem(ITabEventBase e, bool loadingThumb, bool isQuickTab = false)
   {
     var isComposite = e is TabEventComposition;
     var id = (isComposite ? "C:" : "S:") + e.Id.ToString();
@@ -255,7 +260,10 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         badgeCount: badge,
         kind: isComposite ? ListItemKind.EventComposite : ListItemKind.EventSingle,
         thumbnailBytes: null,
-        isThumbnailLoading: loadingThumb
+        isThumbnailLoading: loadingThumb,
+        isQuickTab: isQuickTab,
+        positionX: e.PositionY,
+        positionY: e.PositionX
     );
   }
 
