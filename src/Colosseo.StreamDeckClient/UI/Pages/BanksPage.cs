@@ -34,6 +34,9 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
 
   public override bool ShowNavigationControls => false;
 
+  // Root page — no BACK button
+  public override int KeyBack => -1;
+
   public async Task<bool> RefreshAsync(CancellationToken ct)
   {
     var banks = await _data.GetBanksAsync(ct);

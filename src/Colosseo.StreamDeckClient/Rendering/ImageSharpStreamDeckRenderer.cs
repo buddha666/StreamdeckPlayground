@@ -91,7 +91,7 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
       // Grid pages (EventsGridPage) handle every slot themselves.
       if (page.TryGetItemByKeyIndex(keyIndex, out var gridItem))
       {
-        if (keyIndex == page.KeyBack)
+        if (page.KeyBack >= 0 && keyIndex == page.KeyBack)
         {
           RenderReserved(keyIndex, "BACK", enabled: canGoBack);
         }
@@ -120,7 +120,7 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
         continue;
       }
 
-      if (keyIndex == page.KeyBack)
+      if (page.KeyBack >= 0 && keyIndex == page.KeyBack)
       {
         RenderReserved(keyIndex, "BACK", enabled: canGoBack);
         continue;

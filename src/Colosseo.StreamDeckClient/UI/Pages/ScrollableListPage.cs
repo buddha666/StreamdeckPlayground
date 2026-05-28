@@ -20,10 +20,13 @@ public abstract class ScrollableListPage
 
   /// <summary>
   /// Number of content items per page.
-  /// Standard pages: 7 columns × 4 rows = 28.
-  /// Full-grid pages (ShowNavigationControls=false): 8 columns × 4 rows − 1 back key = 31.
+  /// Standard pages (ShowNavigationControls=true): 7 columns × 4 rows = 28.
+  /// Full-grid pages with back key (ShowNavigationControls=false, KeyBack ≥ 0): 8 × 4 − 1 = 31.
+  /// Full-grid pages without back key (ShowNavigationControls=false, KeyBack &lt; 0): 8 × 4 = 32.
   /// </summary>
-  public int PageSize => ShowNavigationControls ? (Columns - 1) * Rows : Columns * Rows - 1;
+  public int PageSize => ShowNavigationControls
+      ? (Columns - 1) * Rows
+      : (KeyBack < 0 ? Columns * Rows : Columns * Rows - 1);
 
   private readonly object _sync = new();
 
@@ -132,14 +135,14 @@ public abstract class ScrollableListPage
   {
     lock (_sync)
     {
-      // Back button is never an item
-      if (keyIndex == KeyBack) return null;
+      // Back button is never an item (skip check when KeyBack < 0 = no back key)
+      if (KeyBack >= 0 && keyIndex == KeyBack) return null;
 
       if (!ShowNavigationControls)
       {
-        // Full-grid: every key except KeyBack maps directly to a sequential item index.
-        // Keys before KeyBack map 1:1; keys after KeyBack shift down by 1.
-        var indexInPage = keyIndex < KeyBack ? keyIndex : keyIndex - 1;
+        // Full-grid: every key (except the optional back key) maps directly to a sequential item index.
+        // When KeyBack < 0 all keys map 1:1; otherwise keys after KeyBack shift down by 1.
+        var indexInPage = (KeyBack < 0 || keyIndex < KeyBack) ? keyIndex : keyIndex - 1;
         var itemIndex = _offset + indexInPage;
         return itemIndex < _items.Count ? itemIndex : (int?)null;
       }
@@ -166,7 +169,8 @@ public abstract class ScrollableListPage
 
   /// <summary>
   /// Index of the BACK key. Default is 31 (bottom-right). Override to move it
-  /// to a different position (e.g. 24 for bottom-left).
+  /// to a different position (e.g. 24 for bottom-left). Use -1 for no back button
+  /// (root pages that have nowhere to go back to).
   /// </summary>
   public virtual int KeyBack { get { return 31; } }
 
@@ -234,7 +238,7 @@ public abstract class ScrollableListPage
   {
     if (ShowNavigationControls && keyIndex == KeyScrollUp) { ScrollUp(); return; }
     if (ShowNavigationControls && keyIndex == KeyScrollDown) { ScrollDown(); return; }
-    if (keyIndex == KeyBack) { await OnBackAsync(ct); return; }
+    if (KeyBack >= 0 && keyIndex == KeyBack) { await OnBackAsync(ct); return; }
 
     int? itemIndex = TryMapKeyToItemIndex(keyIndex);
     if (!itemIndex.HasValue) return;
