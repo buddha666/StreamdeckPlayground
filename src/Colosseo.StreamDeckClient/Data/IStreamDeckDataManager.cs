@@ -1,22 +1,11 @@
 using Colosseo.Flow.Domain.DomainClasses;
+using Monogram.Sport.FlowBLL.Enums;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Colosseo.StreamDeckClient.Data;
-
-/// <summary>
-/// OSD / action-stop type codes sent to the Flow system.
-/// NOTE: If Colosseo.Flow.Domain already defines this enum, remove this declaration
-/// and add the appropriate using alias.
-/// </summary>
-public enum SystemEventTypeCode
-{
-  OsdTop,
-  OsdMiddle,
-  OsdBottom,
-}
 
 public interface IStreamDeckDataManager
 {

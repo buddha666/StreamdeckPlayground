@@ -42,7 +42,7 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
     var tabs = await _data.GetTabsAsync(_bankId, ct);
 
     // Filter out QuickTab items — they are shown inside EventsGridPage
-    var visibleTabs = tabs.Where(t => !t.IsQuickTab).ToList();
+    var visibleTabs = tabs.Where(t => !t.IsQuick).ToList();
 
     var hash = HashCode.Combine(
         visibleTabs.Count,

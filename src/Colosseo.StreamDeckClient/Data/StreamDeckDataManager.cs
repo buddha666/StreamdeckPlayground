@@ -71,7 +71,7 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
     ct.ThrowIfCancellationRequested();
 
     var tabs = await _flowDataProvider.GetTabsAsync(t => t.IdBank == bankId);
-    var quickTab = tabs.FirstOrDefault(t => t.IsQuickTab);
+    var quickTab = tabs.FirstOrDefault(t => t.IsQuick);
     if (quickTab == null)
       return System.Array.Empty<ITabEventBase>();
 

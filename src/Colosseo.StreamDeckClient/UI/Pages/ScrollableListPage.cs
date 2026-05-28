@@ -209,16 +209,6 @@ public abstract class ScrollableListPage
     }
   }
 
-  public int[] TakeAndClearDirtyKeys()
-  {
-    lock (_sync)
-    {
-      var keys = _dirtyKeys.ToArray();
-      _dirtyKeys.Clear();
-      return keys;
-    }
-  }
-
   public virtual async Task OnKeyDownAsync(int keyIndex, CancellationToken ct)
   {
     if (keyIndex == KeyScrollUp) { ScrollUp(); return; }

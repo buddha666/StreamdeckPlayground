@@ -71,7 +71,6 @@ public sealed class StreamDeckRuntime
 
         await RefreshCurrentPageIfNeededAsync(force: false, ct);
 
-        // RenderAsync atomically takes-and-clears dirty keys, so ClearDirty() is NOT called here.
         await _renderer.RenderAsync(_nav.Current, _nav.CanGoBack, ct);
 
         LogAliveSometimes();
