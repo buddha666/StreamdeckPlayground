@@ -302,7 +302,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
 
     private static int ParseEventId(string id) => int.Parse(id.Substring(2));
 
-    // ---- thumbnail cache (shared with EventsPage) ----
+    // ---- thumbnail cache ----
 
     private Task<byte[]> GetThumbnailCachedAsync(int thumbEventId, CancellationToken ct)
     {

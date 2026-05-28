@@ -181,13 +181,26 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     if (_lastSig.TryGetValue(keyIndex, out var last) && last == sig) return;
 
     using var img = new Image<Rgba32>(KeyWidth, KeyHeight);
-    var bg = enabled ? new Rgba32(20, 20, 20) : new Rgba32(5, 5, 5);
-    var fg = enabled ? new Rgba32(240, 240, 240) : new Rgba32(80, 80, 80);
+
+    bool isBack = text == "BACK";
+    Rgba32 bg, fg, border;
+    if (isBack && enabled)
+    {
+      bg = new Rgba32(160, 20, 20);
+      border = new Rgba32(220, 80, 0);
+      fg = new Rgba32(255, 255, 255);
+    }
+    else
+    {
+      bg = enabled ? new Rgba32(20, 20, 20) : new Rgba32(5, 5, 5);
+      fg = enabled ? new Rgba32(240, 240, 240) : new Rgba32(80, 80, 80);
+      border = fg;
+    }
 
     img.Mutate(ctx =>
     {
       ctx.Fill(bg);
-      ctx.DrawInsetBorder(fg, thickness: BorderThickness, inset: BorderInset, width: KeyWidth, height: KeyHeight);
+      ctx.DrawInsetBorder(border, thickness: BorderThickness, inset: BorderInset, width: KeyWidth, height: KeyHeight);
 
       if (!string.IsNullOrWhiteSpace(text))
         DrawCenteredText(ctx, text, fg, _titleFont);
