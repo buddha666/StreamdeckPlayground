@@ -65,6 +65,21 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
     return events.ToList();
   }
 
+  public async Task<IReadOnlyList<ITabEventBase>> GetQuickTabEventsAsync(int bankId, CancellationToken ct)
+  {
+    ct.ThrowIfCancellationRequested();
+
+    var tabs = await _flowDataProvider.GetTabsAsync(t => t.IdBank == bankId);
+    var quickTab = tabs.FirstOrDefault(t => t.IsQuickTab);
+    if (quickTab == null)
+      return System.Array.Empty<ITabEventBase>();
+
+    var events = await _flowDataProvider.GetTabEventsAsync(quickTab.Id);
+    return events
+        .Where(e => e.PositionY >= 0 && e.PositionY <= 3)
+        .ToList();
+  }
+
   public async Task PlaySingleTabEventLive(int idEvent, CancellationToken ct)
   {
     ct.ThrowIfCancellationRequested();
@@ -77,8 +92,6 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
     {
       await _flowControlProvider.EnqueueAsync<TabEvent>(idEvent, _cfg.FlowSenderIdentifier);
     }
-
-
   }
 
   public async Task PlayCompositeTabEventLive(int idEvent, CancellationToken ct)
@@ -93,7 +106,21 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
     {
       await _flowControlProvider.EnqueueAsync<TabEventComposition>(idEvent, _cfg.FlowSenderIdentifier);
     }
+  }
 
+  public async Task HideOsdAsync(SystemEventTypeCode osdType, CancellationToken ct)
+  {
+    ct.ThrowIfCancellationRequested();
 
+    // NOTE: Adjust the provider call to match the actual IFlowControlProvider API.
+    await _flowControlProvider.HideOsdAsync(osdType, _cfg.FlowSenderIdentifier);
+  }
+
+  public async Task StopActionAsync(CancellationToken ct)
+  {
+    ct.ThrowIfCancellationRequested();
+
+    // NOTE: Adjust the provider call to match the actual IFlowControlProvider API.
+    await _flowControlProvider.StopActionAsync(_cfg.FlowSenderIdentifier);
   }
 }

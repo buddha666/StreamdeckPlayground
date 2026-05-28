@@ -2,6 +2,7 @@
 using Colosseo.Flow.ODataClient.Context;
 using Colosseo.Flow.ODataClient.Providers;
 using Colosseo.OData.Client.Core.Providers;
+using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
 using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Hosting;
@@ -22,6 +23,16 @@ using var host = Host.CreateDefaultBuilder(args)
     })
     .ConfigureServices(services =>
     {
+      // StreamDeck client configuration
+      services.AddSingleton(new StreamDeckClientConfig
+      {
+        FlowSenderIdentifier = "showManager StreamDeck",
+        IsInLiveMode = false,
+        StreamDeckModeIsFollowing = false,
+        StreamDeckShowStopButtons = true,
+        StreamDeckShowQuickTab = true,
+      });
+
       services.AddSingleton<IODataServiceModelProvider, ODataServiceModelProvider>();
       services.AddTransient<FlowContext>(sp =>
       {

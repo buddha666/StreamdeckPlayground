@@ -1,4 +1,5 @@
-﻿using Colosseo.StreamDeckClient.Data;
+﻿using Colosseo.StreamDeckClient.Config;
+using Colosseo.StreamDeckClient.Data;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
 using System;
@@ -15,34 +16,38 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
   private readonly INavigationService _nav;
   private readonly int _bankId;
   private readonly string _bankName;
+  private readonly StreamDeckClientConfig _cfg;
 
   private int? _lastHash;
 
-  public TabsPage(IStreamDeckDataManager data, INavigationService nav, int bankId, string bankName)
+  public TabsPage(IStreamDeckDataManager data, INavigationService nav, int bankId, string bankName, StreamDeckClientConfig cfg)
   {
     _data = data;
     _nav = nav;
     _bankId = bankId;
     _bankName = bankName ?? "";
+    _cfg = cfg;
   }
 
   public override string InfoLabel
   {
-    get
-    {
-      // krátké a čitelné
-      return _bankName.Length > 0 ? ("TABS: " + _bankName) : "TABS";
-    }
+    get { return _bankName.Length > 0 ? ("TABS: " + _bankName) : "TABS"; }
   }
+
+  // BACK button is in the bottom-left corner (x=0, y=3 → keyIndex=24)
+  public override int KeyBack => 24;
 
   public async Task<bool> RefreshAsync(CancellationToken ct)
   {
     var tabs = await _data.GetTabsAsync(_bankId, ct);
 
+    // Filter out QuickTab items — they are shown inside EventsGridPage
+    var visibleTabs = tabs.Where(t => !t.IsQuickTab).ToList();
+
     var hash = HashCode.Combine(
-        tabs.Count,
-        tabs.Count > 0 ? tabs[0].Version : 0,
-        tabs.Count > 0 ? tabs[^1].Version : 0
+        visibleTabs.Count,
+        visibleTabs.Count > 0 ? visibleTabs[0].Version : 0,
+        visibleTabs.Count > 0 ? visibleTabs[^1].Version : 0
     );
 
     if (_lastHash.HasValue && _lastHash.Value == hash)
@@ -50,7 +55,7 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
 
     _lastHash = hash;
 
-    var items = tabs.Select(t =>
+    var items = visibleTabs.Select(t =>
     {
       var accent = ColorUtil.FromFlowColor(t.Color, Color.Black);
       return new ListItem(
@@ -72,7 +77,7 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
     var tabId = int.Parse(item.Id);
     var tabName = item.Title;
 
-    _nav.Push(new EventsPage(_data, _nav, tabId, tabName));
+    _nav.Push(new EventsGridPage(_data, _nav, _bankId, tabId, tabName, _cfg));
     return Task.CompletedTask;
   }
 

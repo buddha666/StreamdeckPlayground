@@ -72,21 +72,41 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
 
   public Task RenderAsync(ScrollableListPage page, bool canGoBack, CancellationToken ct)
   {
-    // Snapshot dirty keys (page may be updated from another thread during rendering)
+    // Atomically snapshot AND clear dirty keys so background threads that set new dirty flags
+    // after this point are not lost (they survive for the next tick).
     int[] dirtyKeys;
     try
     {
-      dirtyKeys = page.DirtyKeys.ToArray();
+      dirtyKeys = page.TakeAndClearDirtyKeys();
     }
     catch
     {
-      // If page is being mutated concurrently (non-thread-safe), avoid crashing render loop
       return Task.CompletedTask;
     }
 
     foreach (var keyIndex in dirtyKeys)
     {
       ct.ThrowIfCancellationRequested();
+
+      // Grid pages (EventsGridPage) handle every slot themselves.
+      if (page.TryGetItemByKeyIndex(keyIndex, out var gridItem))
+      {
+        if (keyIndex == page.KeyBack)
+        {
+          RenderReserved(keyIndex, "BACK", enabled: canGoBack);
+        }
+        else if (gridItem == null)
+        {
+          RenderEmpty(keyIndex);
+        }
+        else
+        {
+          RenderListItem(keyIndex, gridItem);
+        }
+        continue;
+      }
+
+      // ---- standard scrollable-list path ----
 
       if (keyIndex == page.KeyScrollUp)
       {
@@ -191,10 +211,58 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
 
   private void RenderListItem(int keyIndex, ListItem item)
   {
-    if (item.IsEvent)
+    if (item.Kind is ListItemKind.StopOsdTop
+        or ListItemKind.StopOsdMiddle
+        or ListItemKind.StopOsdBottom
+        or ListItemKind.StopAllActions)
+    {
+      RenderStopItem(keyIndex, item);
+    }
+    else if (item.IsEvent)
+    {
       RenderEventItem(keyIndex, item);
+    }
     else
+    {
       RenderClassicItem(keyIndex, item);
+    }
+  }
+
+  private void RenderStopItem(int keyIndex, ListItem item)
+  {
+    var sig = $"stop:{item.Kind}:{item.Title}";
+    if (_lastSig.TryGetValue(keyIndex, out var last) && last == sig) return;
+
+    using var img = new Image<Rgba32>(KeyWidth, KeyHeight);
+
+    var bg = item.Kind == ListItemKind.StopAllActions
+        ? new Rgba32(160, 20, 20)
+        : new Rgba32(100, 30, 0);
+
+    var border = new Rgba32(220, 80, 0);
+
+    var title = (item.Title ?? "").Trim();
+    title = TextUtils.BreakLongWords(title, WordBreakChunkSize);
+
+    img.Mutate(ctx =>
+    {
+      ctx.Fill(bg);
+      ctx.DrawInsetBorder(border, thickness: BorderThickness, inset: BorderInset, width: KeyWidth, height: KeyHeight);
+
+      var textRect = Inset(new Rectangle(0, 0, KeyWidth, KeyHeight), SafeInset);
+      if (ShouldClassicUseMultilineCentered(title))
+      {
+        title = BalanceTitleLines(title, MaxLines, MaxCharsPerLine);
+        DrawManualMultilineCentered(ctx, title, new Rgba32(255, 255, 255, 255), _titleFont, textRect);
+      }
+      else
+      {
+        DrawCenteredText(ctx, title, new Rgba32(255, 255, 255, 255), _titleFont, textRect);
+      }
+    });
+
+    Send(keyIndex, img);
+    _lastSig[keyIndex] = sig;
   }
 
   private void RenderEventItem(int keyIndex, ListItem item)

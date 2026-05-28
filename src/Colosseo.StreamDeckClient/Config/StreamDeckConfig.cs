@@ -5,4 +5,13 @@ public sealed class StreamDeckClientConfig
   public string FlowSenderIdentifier { get; init; } = "showManager StreamDeck";
 
   public bool IsInLiveMode { get; init; } = false;
+
+  /// <summary>When true the "follow" mode layout is used (not yet implemented).</summary>
+  public bool StreamDeckModeIsFollowing { get; init; } = false;
+
+  /// <summary>When true the last column (x=7) is reserved for STOP-action buttons.</summary>
+  public bool StreamDeckShowStopButtons { get; init; } = true;
+
+  /// <summary>When true the QuickTab column is shown next to the stop buttons (or as the last column when stop buttons are hidden).</summary>
+  public bool StreamDeckShowQuickTab { get; init; } = true;
 }

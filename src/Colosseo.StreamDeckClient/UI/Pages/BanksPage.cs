@@ -1,4 +1,5 @@
 ﻿using Colosseo.Flow.Domain.DomainClasses;
+using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
@@ -15,13 +16,15 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
 {
   private readonly IStreamDeckDataManager _data;
   private readonly INavigationService _nav;
+  private readonly StreamDeckClientConfig _cfg;
 
-  private int? _lastHash; // jednoduchá detekce změny
+  private int? _lastHash;
 
-  public BanksPage(IStreamDeckDataManager data, INavigationService nav)
+  public BanksPage(IStreamDeckDataManager data, INavigationService nav, StreamDeckClientConfig cfg)
   {
     _data = data;
     _nav = nav;
+    _cfg = cfg;
   }
 
   public override string InfoLabel
@@ -33,7 +36,6 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
   {
     var banks = await _data.GetBanksAsync(ct);
 
-    // jednoduchý "hash": počty+verze+names (můžeš zlepšit)
     var hash = HashCode.Combine(
         banks.Count,
         banks.Count > 0 ? banks[0].Version : 0,
@@ -67,13 +69,13 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
     var bankId = int.Parse(item.Id);
     var bankName = item.Title;
 
-    _nav.Push(new TabsPage(_data, _nav, bankId, bankName));
+    _nav.Push(new TabsPage(_data, _nav, bankId, bankName, _cfg));
     return Task.CompletedTask;
   }
 
   protected override Task OnBackAsync(CancellationToken ct)
   {
-    // root page - nic
+    // root page — no back
     return Task.CompletedTask;
   }
 }

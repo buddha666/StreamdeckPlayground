@@ -7,5 +7,9 @@
     Tab = 2,
     EventSingle = 3,
     EventComposite = 4,
+    StopOsdTop = 5,
+    StopOsdMiddle = 6,
+    StopOsdBottom = 7,
+    StopAllActions = 8,
   }
 }

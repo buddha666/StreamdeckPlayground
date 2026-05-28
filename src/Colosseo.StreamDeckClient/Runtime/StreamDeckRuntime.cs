@@ -1,4 +1,5 @@
-﻿using Colosseo.StreamDeckClient.Data;
+﻿using Colosseo.StreamDeckClient.Config;
+using Colosseo.StreamDeckClient.Data;
 using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
@@ -18,6 +19,7 @@ public sealed class StreamDeckRuntime
   private readonly INavigationService _nav;
   private readonly IStreamDeckRenderer _renderer;
   private readonly ILogger<StreamDeckRuntime> _logger;
+  private readonly StreamDeckClientConfig _cfg;
 
   private readonly ConcurrentQueue<KeyStateChangedEventArgs> _inputQueue = new();
 
@@ -32,12 +34,14 @@ public sealed class StreamDeckRuntime
     IStreamDeckDataManager dataManager,
     INavigationService navigationService,
     IStreamDeckRenderer renderer,
+    StreamDeckClientConfig cfg,
     ILogger<StreamDeckRuntime> logger)
   {
     _device = device;
     _dataManager = dataManager;
     _nav = navigationService;
     _renderer = renderer;
+    _cfg = cfg;
     _logger = logger;
   }
 
@@ -57,7 +61,7 @@ public sealed class StreamDeckRuntime
       await _device.ClearAsync(ct);
       await _device.SetBrightnessAsync(50, ct);
 
-      _nav.SetRoot(new BanksPage(_dataManager, _nav));
+      _nav.SetRoot(new BanksPage(_dataManager, _nav, _cfg));
 
       await RefreshCurrentPageIfNeededAsync(force: true, ct);
 
@@ -67,8 +71,8 @@ public sealed class StreamDeckRuntime
 
         await RefreshCurrentPageIfNeededAsync(force: false, ct);
 
+        // RenderAsync atomically takes-and-clears dirty keys, so ClearDirty() is NOT called here.
         await _renderer.RenderAsync(_nav.Current, _nav.CanGoBack, ct);
-        _nav.Current.ClearDirty();
 
         LogAliveSometimes();
 
@@ -89,7 +93,6 @@ public sealed class StreamDeckRuntime
 
       try
       {
-        // IMPORTANT: clear even when ct is canceled
         await _device.ClearAsync(CancellationToken.None);
       }
       catch { }
@@ -104,7 +107,6 @@ public sealed class StreamDeckRuntime
 
   private void OnKeyStateChanged(object sender, KeyStateChangedEventArgs e)
   {
-    // We need just down
     if (!e.IsDown) return;
     _inputQueue.Enqueue(e);
   }
@@ -113,11 +115,7 @@ public sealed class StreamDeckRuntime
   {
     while (_inputQueue.TryDequeue(out var e))
     {
-      // navigation should handle the input and decide what to do with it (e.g. pass to page, change page, etc.)
       await _nav.Current.OnKeyDownAsync(e.KeyIndex, ct);
-
-      // After input, a rerender is typically needed (the page marks itself dirty in ScrollUp/Down/SetItems, etc.)
-      // Rendering will occur in the main loop
     }
   }
 
@@ -136,7 +134,6 @@ public sealed class StreamDeckRuntime
         var changed = await refreshable.RefreshAsync(ct);
         if (changed)
         {
-          // Page should set items and mark dirty if something changed, so we can just trigger a render in the main loop
           _logger.LogDebug("Page refreshed and changed: {PageType}", _nav.Current.GetType().Name);
         }
       }

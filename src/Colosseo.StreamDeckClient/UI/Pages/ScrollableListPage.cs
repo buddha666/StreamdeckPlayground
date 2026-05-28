@@ -55,6 +55,16 @@ public abstract class ScrollableListPage
     return false;
   }
 
+  /// <summary>
+  /// Grid-pages (e.g. EventsGridPage) override this to expose items directly by key index
+  /// rather than through the offset-based list mapping. Returns false on the base class.
+  /// </summary>
+  public virtual bool TryGetItemByKeyIndex(int keyIndex, out ListItem item)
+  {
+    item = null;
+    return false;
+  }
+
   public bool CanScrollUp
   {
     get { lock (_sync) return _offset > 0; }
@@ -111,6 +121,9 @@ public abstract class ScrollableListPage
   {
     lock (_sync)
     {
+      // Back button position is reserved regardless of which column it lives in
+      if (keyIndex == KeyBack) return null;
+
       var col = keyIndex % Columns;
       var row = keyIndex / Columns;
 
@@ -124,21 +137,45 @@ public abstract class ScrollableListPage
     }
   }
 
+  // ---- Navigation keys ----
+
   public int KeyScrollUp { get { return 7; } }
   public int KeyScrollDown { get { return 15; } }
   public int KeyInfo { get { return 23; } }
-  public int KeyBack { get { return 31; } }
+
+  /// <summary>
+  /// Index of the BACK key. Default is 31 (bottom-right). Override to move it
+  /// to a different position (e.g. 24 for bottom-left).
+  /// </summary>
+  public virtual int KeyBack { get { return 31; } }
+
+  // ---- Dirty-key tracking ----
 
   private readonly HashSet<int> _dirtyKeys = new();
+
   public IReadOnlyCollection<int> DirtyKeys
   {
     get
     {
       lock (_sync)
       {
-        // return a snapshot to avoid "collection modified" in renderer
         return _dirtyKeys.ToArray();
       }
+    }
+  }
+
+  /// <summary>
+  /// Atomically snapshots and clears the dirty-key set. Use this in the renderer
+  /// instead of reading DirtyKeys and later calling ClearDirty(), to avoid losing
+  /// dirty flags that background threads add while the renderer is running.
+  /// </summary>
+  public int[] TakeAndClearDirtyKeys()
+  {
+    lock (_sync)
+    {
+      var keys = _dirtyKeys.ToArray();
+      _dirtyKeys.Clear();
+      return keys;
     }
   }
 
@@ -157,6 +194,15 @@ public abstract class ScrollableListPage
       _dirtyKeys.Add(i);
   }
 
+  /// <summary>Marks a single key as dirty (thread-safe). Used by grid pages for per-slot updates.</summary>
+  protected internal void MarkKeyDirty(int keyIndex)
+  {
+    lock (_sync)
+    {
+      _dirtyKeys.Add(keyIndex);
+    }
+  }
+
   public void ClearDirty()
   {
     lock (_sync)
@@ -165,7 +211,7 @@ public abstract class ScrollableListPage
     }
   }
 
-  public async Task OnKeyDownAsync(int keyIndex, CancellationToken ct)
+  public virtual async Task OnKeyDownAsync(int keyIndex, CancellationToken ct)
   {
     if (keyIndex == KeyScrollUp) { ScrollUp(); return; }
     if (keyIndex == KeyScrollDown) { ScrollDown(); return; }
@@ -177,7 +223,6 @@ public abstract class ScrollableListPage
     ListItem item;
     lock (_sync)
     {
-      // index could be out-of-range if items changed concurrently
       if (itemIndex.Value < 0 || itemIndex.Value >= _items.Count) return;
       item = _items[itemIndex.Value];
     }
