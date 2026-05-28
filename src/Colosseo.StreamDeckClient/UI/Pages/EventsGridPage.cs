@@ -33,6 +33,9 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
   private sealed record CacheEntry(Lazy<Task<byte[]>> LazyTask, DateTimeOffset CreatedAt, bool IsNegative);
   private static readonly TimeSpan NegativeTtl = TimeSpan.FromMinutes(10);
 
+  private int? _lastEventsHash;
+  private int? _lastQuickHash;
+
   // Flat array of slots, indexed by keyIndex (0..31).
   // Null means an empty slot (nothing rendered there except BACK for index 24).
   private readonly ListItem[] _slots = new ListItem[Columns * Rows];
@@ -79,6 +82,25 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
 
     var events = await eventsTask;
     var quickEvents = await quickTask;
+
+    // Hash check: if neither list changed, leave _slots as-is so loaded thumbnails persist.
+    var eventsHash = HashCode.Combine(
+        events.Count,
+        events.Count > 0 ? events[0].Id : 0,
+        events.Count > 0 ? events[^1].Id : 0
+    );
+    var quickHash = HashCode.Combine(
+        quickEvents.Count,
+        quickEvents.Count > 0 ? quickEvents[0].Id : 0,
+        quickEvents.Count > 0 ? quickEvents[^1].Id : 0
+    );
+
+    if (_lastEventsHash.HasValue && _lastEventsHash.Value == eventsHash &&
+        _lastQuickHash.HasValue && _lastQuickHash.Value == quickHash)
+      return false;
+
+    _lastEventsHash = eventsHash;
+    _lastQuickHash = quickHash;
 
     // Build slot array
     var slots = new ListItem[Columns * Rows];

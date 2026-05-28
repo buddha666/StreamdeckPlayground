@@ -34,6 +34,8 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
     get { return _bankName.Length > 0 ? ("TABS: " + _bankName) : "TABS"; }
   }
 
+  public override bool ShowNavigationControls => false;
+
   // BACK button is in the bottom-left corner (x=0, y=3 → keyIndex=24)
   public override int KeyBack => 24;
 

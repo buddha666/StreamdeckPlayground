@@ -108,13 +108,13 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
 
       // ---- standard scrollable-list path ----
 
-      if (keyIndex == page.KeyScrollUp)
+      if (page.ShowNavigationControls && keyIndex == page.KeyScrollUp)
       {
         RenderReserved(keyIndex, "UP", enabled: page.CanScrollUp);
         continue;
       }
 
-      if (keyIndex == page.KeyScrollDown)
+      if (page.ShowNavigationControls && keyIndex == page.KeyScrollDown)
       {
         RenderReserved(keyIndex, "DN", enabled: page.CanScrollDown);
         continue;
@@ -126,7 +126,7 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
         continue;
       }
 
-      if (keyIndex == page.KeyInfo)
+      if (page.ShowNavigationControls && keyIndex == page.KeyInfo)
       {
         var pageNo = page.PageSize == 0 ? 1 : (page.Offset / page.PageSize) + 1;
         var pages = page.PageSize == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(page.ItemCount / (double)page.PageSize));

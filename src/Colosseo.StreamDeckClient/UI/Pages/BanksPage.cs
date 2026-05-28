@@ -32,6 +32,8 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
     get { return "BANKS"; }
   }
 
+  public override bool ShowNavigationControls => false;
+
   public async Task<bool> RefreshAsync(CancellationToken ct)
   {
     var banks = await _data.GetBanksAsync(ct);

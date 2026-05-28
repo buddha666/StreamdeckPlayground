@@ -12,7 +12,18 @@ public abstract class ScrollableListPage
   public const int Rows = 4;
   public const int ReservedCol = 7;
 
-  public int PageSize { get { return (Columns - 1) * Rows; } } // 28
+  /// <summary>
+  /// When true (default) column 7 is reserved for UP / DOWN / Info / Back navigation controls.
+  /// Override to false in pages that want all 8 columns filled with content items.
+  /// </summary>
+  public virtual bool ShowNavigationControls => true;
+
+  /// <summary>
+  /// Number of content items per page.
+  /// Standard pages: 7 columns × 4 rows = 28.
+  /// Full-grid pages (ShowNavigationControls=false): 8 columns × 4 rows − 1 back key = 31.
+  /// </summary>
+  public int PageSize => ShowNavigationControls ? (Columns - 1) * Rows : Columns * Rows - 1;
 
   private readonly object _sync = new();
 
@@ -121,19 +132,29 @@ public abstract class ScrollableListPage
   {
     lock (_sync)
     {
-      // Back button position is reserved regardless of which column it lives in
+      // Back button is never an item
       if (keyIndex == KeyBack) return null;
 
+      if (!ShowNavigationControls)
+      {
+        // Full-grid: every key except KeyBack maps directly to a sequential item index.
+        // Keys before KeyBack map 1:1; keys after KeyBack shift down by 1.
+        var indexInPage = keyIndex < KeyBack ? keyIndex : keyIndex - 1;
+        var itemIndex = _offset + indexInPage;
+        return itemIndex < _items.Count ? itemIndex : (int?)null;
+      }
+
+      // Standard scroll-list: column 7 is reserved for navigation keys.
       var col = keyIndex % Columns;
       var row = keyIndex / Columns;
 
       if (row < 0 || row >= Rows) return null;
       if (col == ReservedCol) return null;
 
-      var indexInPage = row * (Columns - 1) + col;
-      var itemIndex = _offset + indexInPage;
+      var indexInPageStd = row * (Columns - 1) + col;
+      var itemIndexStd = _offset + indexInPageStd;
 
-      return itemIndex < _items.Count ? itemIndex : (int?)null;
+      return itemIndexStd < _items.Count ? itemIndexStd : (int?)null;
     }
   }
 
@@ -211,8 +232,8 @@ public abstract class ScrollableListPage
 
   public virtual async Task OnKeyDownAsync(int keyIndex, CancellationToken ct)
   {
-    if (keyIndex == KeyScrollUp) { ScrollUp(); return; }
-    if (keyIndex == KeyScrollDown) { ScrollDown(); return; }
+    if (ShowNavigationControls && keyIndex == KeyScrollUp) { ScrollUp(); return; }
+    if (ShowNavigationControls && keyIndex == KeyScrollDown) { ScrollDown(); return; }
     if (keyIndex == KeyBack) { await OnBackAsync(ct); return; }
 
     int? itemIndex = TryMapKeyToItemIndex(keyIndex);
