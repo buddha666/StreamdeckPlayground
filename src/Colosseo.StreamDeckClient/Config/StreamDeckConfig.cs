@@ -6,7 +6,9 @@ public sealed class StreamDeckClientConfig
 
   public bool IsInLiveMode { get; init; } = false;
 
-  /// <summary>When true the "follow" mode layout is used (not yet implemented).</summary>
+  /// <summary>When true the "following" mode layout is used: events are shown directly
+  /// for the tab selected via <see cref="Colosseo.StreamDeckClient.Data.ISelectedTabProvider"/>
+  /// without any bank/tab navigation.</summary>
   public bool StreamDeckModeIsFollowing { get; init; } = false;
 
   /// <summary>When true the last column (x=7) is reserved for STOP-action buttons.</summary>

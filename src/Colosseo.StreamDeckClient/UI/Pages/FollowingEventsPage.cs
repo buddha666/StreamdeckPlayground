@@ -200,7 +200,7 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
                 {
                     try
                     {
-                        var thumbId = int.Parse(capturedItem.Id.Substring(2));
+                        var thumbId = ParseEventId(capturedItem.Id);
                         byte[] thumbBytes = await GetThumbnailCachedAsync(thumbId, ct).ConfigureAwait(false);
                         var updated = new ListItem(
                             id: capturedItem.Id,
@@ -248,10 +248,10 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
         switch (item.Kind)
         {
             case ListItemKind.EventSingle:
-                await _data.PlaySingleTabEventLive(int.Parse(item.Id.Substring(2)), ct);
+                await _data.PlaySingleTabEventLive(ParseEventId(item.Id), ct);
                 break;
             case ListItemKind.EventComposite:
-                await _data.PlayCompositeTabEventLive(int.Parse(item.Id.Substring(2)), ct);
+                await _data.PlayCompositeTabEventLive(ParseEventId(item.Id), ct);
                 break;
             case ListItemKind.StopOsdTop:
                 await _data.HideOsd(SystemEventTypeCode.OsdTop, ct);
@@ -273,6 +273,8 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
     protected override Task OnBackAsync(CancellationToken ct) => Task.CompletedTask;
 
     // ---- helpers ----
+
+    private static int ParseEventId(string id) => int.Parse(id.Substring(2));
 
     private static ListItem MakeStopItem(ListItemKind kind, string title) =>
         new ListItem(
