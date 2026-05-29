@@ -43,6 +43,7 @@ using var host = Host.CreateDefaultBuilder(args)
 
       services.AddSingleton<IStreamDeckDeviceConnection, StreamDeckDeviceConnection>();
       services.AddSingleton<IStreamDeckDataManager, StreamDeckDataManager>();
+      services.AddSingleton<ISelectedTabProvider, SelectedTabProvider>();
       services.AddSingleton<INavigationService, NavigationService>();
       services.AddSingleton<StreamDeckRuntime>();
       services.AddSingleton<IStreamDeckRenderer, ImageSharpStreamDeckRenderer>();
