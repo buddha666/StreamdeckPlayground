@@ -16,6 +16,7 @@ public sealed class StreamDeckRuntime
 {
   private readonly IStreamDeckDeviceConnection _device;
   private readonly IStreamDeckDataManager _dataManager;
+  private readonly ISelectedTabProvider _selectedTab;
   private readonly INavigationService _nav;
   private readonly IStreamDeckRenderer _renderer;
   private readonly ILogger<StreamDeckRuntime> _logger;
@@ -32,6 +33,7 @@ public sealed class StreamDeckRuntime
   public StreamDeckRuntime(
     IStreamDeckDeviceConnection device,
     IStreamDeckDataManager dataManager,
+    ISelectedTabProvider selectedTab,
     INavigationService navigationService,
     IStreamDeckRenderer renderer,
     StreamDeckClientConfig cfg,
@@ -39,6 +41,7 @@ public sealed class StreamDeckRuntime
   {
     _device = device;
     _dataManager = dataManager;
+    _selectedTab = selectedTab;
     _nav = navigationService;
     _renderer = renderer;
     _cfg = cfg;
@@ -61,7 +64,10 @@ public sealed class StreamDeckRuntime
       await _device.ClearAsync(ct);
       await _device.SetBrightnessAsync(50, ct);
 
-      _nav.SetRoot(new BanksPage(_dataManager, _nav, _cfg));
+      if (_cfg.StreamDeckModeIsFollowing)
+        _nav.SetRoot(new FollowingEventsPage(_dataManager, _selectedTab, _cfg));
+      else
+        _nav.SetRoot(new BanksPage(_dataManager, _nav, _cfg));
 
       await RefreshCurrentPageIfNeededAsync(force: true, ct);
 
