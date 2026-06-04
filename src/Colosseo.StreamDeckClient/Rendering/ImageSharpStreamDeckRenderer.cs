@@ -324,18 +324,21 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     {
       if (isComposite)
       {
-        // Composite: classic-style border identical to TabEvents (accent background + black inset border)
+        // Composite: accent background fills the full key, then a black inset ring is drawn
+        // on top (identical to RenderClassicItem).  The inner area intentionally stays
+        // accent-coloured so the black ring (pixels 4..7) is visually distinguishable
+        // from the surrounding accent area — filling the inner area with black would make
+        // the ring invisible (black-on-black).  The thumbnail/loading placeholder below
+        // covers the inner area when present.
         ctx.Fill(frameColor);
         ctx.DrawInsetBorder(new Rgba32(0, 0, 0, 255), thickness: 4, inset: 4, width: KeyWidth, height: KeyHeight);
       }
       else
       {
-        // Single event: accent colour frame surrounding black inner area
+        // Single event: accent colour frame surrounding a black inner area
         ctx.Fill(frameColor);
+        ctx.Fill(new Rgba32(0, 0, 0, 255), inner);
       }
-
-      // inner background
-      ctx.Fill(new Rgba32(0, 0, 0, 255), inner);
 
       // thumbnail OR loading placeholder (only background; no text to avoid clashing with title strip)
       if (thumb != null)
