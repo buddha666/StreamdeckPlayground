@@ -1,4 +1,5 @@
-﻿using DrawingColor = System.Drawing.Color;
+﻿using System.Collections.Generic;
+using DrawingColor = System.Drawing.Color;
 
 namespace Colosseo.StreamDeckClient.UI;
 
@@ -23,7 +24,13 @@ public sealed class ListItem
   /// </summary>
   public int PositionY { get; set; }
 
-  public ListItem(string id, string title, DrawingColor? accentColor, int? badgeCount, ListItemKind kind, bool isThumbnailLoading, byte[] thumbnailBytes = null, bool isQuickTab = false, int positionX = 0, int positionY = 0)
+  /// <summary>
+  /// For <see cref="ListItemKind.EventComposite"/> items: the IDs of the child <c>TabEvent</c>s
+  /// (up to 4) used to build the composite thumbnail.  <c>null</c> for all other kinds.
+  /// </summary>
+  public IReadOnlyList<int> ChildEventIds { get; }
+
+  public ListItem(string id, string title, DrawingColor? accentColor, int? badgeCount, ListItemKind kind, bool isThumbnailLoading, byte[] thumbnailBytes = null, bool isQuickTab = false, int positionX = 0, int positionY = 0, IReadOnlyList<int> childEventIds = null)
   {
     Id = id;
     Title = title;
@@ -35,5 +42,6 @@ public sealed class ListItem
     IsQuickTab = isQuickTab;
     PositionX = positionX;
     PositionY = positionY;
+    ChildEventIds = childEventIds;
   }
 }

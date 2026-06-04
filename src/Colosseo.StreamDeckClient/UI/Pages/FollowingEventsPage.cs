@@ -201,7 +201,10 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
                     try
                     {
                         var thumbId = ParseEventId(capturedItem.Id);
-                        byte[] thumbBytes = await GetThumbnailCachedAsync(thumbId, ct).ConfigureAwait(false);
+                        byte[] thumbBytes = capturedItem.Kind == ListItemKind.EventComposite
+                            && capturedItem.ChildEventIds is { Count: > 0 }
+                            ? await GetCompositeThumbnailCachedAsync(thumbId, capturedItem.ChildEventIds, ct).ConfigureAwait(false)
+                            : await GetThumbnailCachedAsync(thumbId, ct).ConfigureAwait(false);
                         var updated = new ListItem(
                             id: capturedItem.Id,
                             title: capturedItem.Title,
@@ -212,7 +215,8 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
                             isThumbnailLoading: false,
                             isQuickTab: capturedItem.IsQuickTab,
                             positionX: capturedItem.PositionX,
-                            positionY: capturedItem.PositionY
+                            positionY: capturedItem.PositionY,
+                            childEventIds: capturedItem.ChildEventIds
                         );
                         lock (_slots) { _slots[capturedKi] = updated; }
                         MarkKeyDirty(capturedKi);
@@ -293,8 +297,12 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
         var id = (isComposite ? "C:" : "S:") + e.Id.ToString();
         var accent = ColorUtil.FromFlowColor(e.Color, Color.Black);
         int? badge = null;
+        IReadOnlyList<int> childIds = null;
         if (e is TabEventComposition comp)
+        {
             badge = comp.TabEvents?.Count ?? 0;
+            childIds = comp.TabEvents?.Select(t => t.Id).ToList();
+        }
 
         return new ListItem(
             id: id,
@@ -307,7 +315,8 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
             isQuickTab: isQuickTab,
             // Switch X and Y (same convention as EventsGridPage)
             positionX: e.PositionY,
-            positionY: e.PositionX
+            positionY: e.PositionX,
+            childEventIds: childIds
         );
     }
 
@@ -329,6 +338,26 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
         });
 
         return AwaitAndMarkNegativeAsync(thumbEventId, entry, ct);
+    }
+
+    private Task<byte[]> GetCompositeThumbnailCachedAsync(int compositeId, IReadOnlyList<int> childIds, CancellationToken ct)
+    {
+        if (_thumbCache.TryGetValue(compositeId, out var existing)
+            && existing.IsNegative
+            && (DateTimeOffset.UtcNow - existing.CreatedAt) > NegativeTtl)
+        {
+            _thumbCache.TryRemove(compositeId, out _);
+        }
+
+        var entry = _thumbCache.GetOrAdd(compositeId, _ =>
+        {
+            var lazy = new Lazy<Task<byte[]>>(
+                () => FetchCompositeThumbnailBytesAsync(childIds, CancellationToken.None),
+                isThreadSafe: true);
+            return new CacheEntry(lazy, DateTimeOffset.UtcNow, IsNegative: false);
+        });
+
+        return AwaitAndMarkNegativeAsync(compositeId, entry, ct);
     }
 
     private async Task<byte[]> AwaitAndMarkNegativeAsync(int thumbEventId, CacheEntry entry, CancellationToken ct)
@@ -361,6 +390,17 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
             await s.CopyToAsync(ms, CancellationToken.None).ConfigureAwait(false);
             var bytes = ms.ToArray();
             return bytes.Length > 0 ? bytes : null;
+        }
+        catch { return null; }
+    }
+
+    private async Task<byte[]> FetchCompositeThumbnailBytesAsync(IReadOnlyList<int> childIds, CancellationToken ct)
+    {
+        try
+        {
+            var ids = childIds.Take(4).ToList();
+            var childBytes = await Task.WhenAll(ids.Select(id => GetThumbnailCachedAsync(id, ct))).ConfigureAwait(false);
+            return Rendering.ThumbnailCompositor.Build(childBytes);
         }
         catch { return null; }
     }
