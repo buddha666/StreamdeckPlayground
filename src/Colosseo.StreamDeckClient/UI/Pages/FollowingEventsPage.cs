@@ -29,6 +29,11 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
     private readonly StreamDeckClientConfig _cfg;
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, CacheEntry> _thumbCache = new();
+    // Separate cache for composite thumbnails: prevents ID-space collisions with the
+    // single-event _thumbCache (child tab-event IDs and composite event IDs share the
+    // same integer space, so using one dictionary causes GetOrAdd to return a wrong or
+    // negative child-thumbnail entry when a composite event has the same ID as a child).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, CacheEntry> _compositeThumbCache = new();
     private sealed record CacheEntry(Lazy<Task<byte[]>> LazyTask, DateTimeOffset CreatedAt, bool IsNegative);
     private static readonly TimeSpan NegativeTtl = TimeSpan.FromMinutes(10);
 
@@ -337,19 +342,19 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
             return new CacheEntry(lazy, DateTimeOffset.UtcNow, IsNegative: false);
         });
 
-        return AwaitAndMarkNegativeAsync(thumbEventId, entry, ct);
+        return AwaitAndMarkNegativeAsync(_thumbCache, thumbEventId, entry, ct);
     }
 
     private Task<byte[]> GetCompositeThumbnailCachedAsync(int compositeId, IReadOnlyList<int> childIds, CancellationToken ct)
     {
-        if (_thumbCache.TryGetValue(compositeId, out var existing)
+        if (_compositeThumbCache.TryGetValue(compositeId, out var existing)
             && existing.IsNegative
             && (DateTimeOffset.UtcNow - existing.CreatedAt) > NegativeTtl)
         {
-            _thumbCache.TryRemove(compositeId, out _);
+            _compositeThumbCache.TryRemove(compositeId, out _);
         }
 
-        var entry = _thumbCache.GetOrAdd(compositeId, _ =>
+        var entry = _compositeThumbCache.GetOrAdd(compositeId, _ =>
         {
             var lazy = new Lazy<Task<byte[]>>(
                 () => FetchCompositeThumbnailBytesAsync(childIds, CancellationToken.None),
@@ -357,10 +362,12 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
             return new CacheEntry(lazy, DateTimeOffset.UtcNow, IsNegative: false);
         });
 
-        return AwaitAndMarkNegativeAsync(compositeId, entry, ct);
+        return AwaitAndMarkNegativeAsync(_compositeThumbCache, compositeId, entry, ct);
     }
 
-    private async Task<byte[]> AwaitAndMarkNegativeAsync(int thumbEventId, CacheEntry entry, CancellationToken ct)
+    private async Task<byte[]> AwaitAndMarkNegativeAsync(
+        System.Collections.Concurrent.ConcurrentDictionary<int, CacheEntry> cache,
+        int thumbEventId, CacheEntry entry, CancellationToken ct)
     {
         byte[] bytes;
         try { bytes = await entry.LazyTask.Value.WaitAsync(ct).ConfigureAwait(false); }
@@ -369,7 +376,7 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
 
         if (bytes == null)
         {
-            _thumbCache.AddOrUpdate(
+            cache.AddOrUpdate(
                 thumbEventId,
                 _ => new CacheEntry(new Lazy<Task<byte[]>>(() => Task.FromResult<byte[]>(null), true),
                                     DateTimeOffset.UtcNow, IsNegative: true),
