@@ -1,4 +1,5 @@
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System.Collections.Generic;
@@ -21,13 +22,13 @@ public static class ThumbnailCompositor
     private static readonly int CellB = ImageSize - SepSize - CellA;             // 48
 
     // Quadrant layout (0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right)
-    private static readonly Rectangle[] Quads =
-    [
-        new Rectangle(0,          0,          CellA, CellA),
-        new Rectangle(CellA + SepSize, 0,     CellB, CellA),
-        new Rectangle(0,          CellA + SepSize, CellA, CellB),
-        new Rectangle(CellA + SepSize, CellA + SepSize, CellB, CellB),
-    ];
+    private static readonly Rectangle[] Quads = new Rectangle[]
+    {
+        new Rectangle(0,                0,                CellA, CellA),
+        new Rectangle(CellA + SepSize, 0,                CellB, CellA),
+        new Rectangle(0,                CellA + SepSize, CellA, CellB),
+        new Rectangle(CellA + SepSize, CellA + SepSize,  CellB, CellB),
+    };
 
     /// <summary>
     /// Composites up to four child thumbnail byte arrays (PNG/JPEG/…) into a single
