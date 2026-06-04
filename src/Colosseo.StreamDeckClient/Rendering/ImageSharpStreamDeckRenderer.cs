@@ -289,7 +289,8 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     DrawingColor accent = item.AccentColor ?? DrawingColor.Black;
     var frameColor = new Rgba32(accent.R, accent.G, accent.B, 255);
 
-    var inner = GetInnerRect();
+    bool isComposite = item.Kind == ListItemKind.EventComposite;
+    var inner = isComposite ? GetCompositeInnerRect() : GetInnerRect();
 
     var isLoadingThumb = item.IsThumbnailLoading;
     var hasThumbBytes = item.ThumbnailBytes is { Length: > 0 };
@@ -321,8 +322,17 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
 
     img.Mutate(ctx =>
     {
-      // accent frame
-      ctx.Fill(frameColor);
+      if (isComposite)
+      {
+        // Composite: classic-style border identical to TabEvents (accent background + black inset border)
+        ctx.Fill(frameColor);
+        ctx.DrawInsetBorder(new Rgba32(0, 0, 0, 255), thickness: 4, inset: 4, width: KeyWidth, height: KeyHeight);
+      }
+      else
+      {
+        // Single event: accent colour frame surrounding black inner area
+        ctx.Fill(frameColor);
+      }
 
       // inner background
       ctx.Fill(new Rgba32(0, 0, 0, 255), inner);
@@ -444,6 +454,16 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
   private static Rectangle GetInnerRect()
   {
     var m = EventFrameInset + EventFrameThickness;
+    return new Rectangle(m, m, KeyWidth - (m * 2), KeyHeight - (m * 2));
+  }
+
+  /// <summary>
+  /// Inner rectangle for composite events whose outer border matches classic TabEvents
+  /// (DrawInsetBorder with inset=4, thickness=4 → content starts at offset 8).
+  /// </summary>
+  private static Rectangle GetCompositeInnerRect()
+  {
+    const int m = 4 + 4; // inset(4) + thickness(4) matching RenderClassicItem border
     return new Rectangle(m, m, KeyWidth - (m * 2), KeyHeight - (m * 2));
   }
 

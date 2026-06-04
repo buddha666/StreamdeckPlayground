@@ -40,30 +40,20 @@ public static class ThumbnailCompositor
     /// </param>
     public static byte[] Build(IReadOnlyList<byte[]> childBytes)
     {
-        using var composite = new Image<Rgba32>(ImageSize, ImageSize);
+        int count = System.Math.Min(childBytes?.Count ?? 0, 4);
+        var tiles = new Image<Rgba32>?[4];
 
-        composite.Mutate(ctx =>
+        try
         {
-            // Background: black
-            ctx.Fill(new Rgba32(0, 0, 0));
-
-            // Separator lines (white)
-            ctx.Fill(new Rgba32(255, 255, 255),
-                new Rectangle(CellA, 0,    SepSize, ImageSize)); // vertical
-            ctx.Fill(new Rgba32(255, 255, 255),
-                new Rectangle(0,    CellA, ImageSize, SepSize)); // horizontal
-
-            // Draw each quadrant
-            int count = System.Math.Min(childBytes?.Count ?? 0, 4);
+            // Load and resize every tile *before* entering the Mutate call so that
+            // all Image objects are alive for the entire compositing operation.
             for (int i = 0; i < count; i++)
             {
                 var bytes = childBytes![i];
                 if (bytes == null || bytes.Length == 0) continue;
-
-                Image<Rgba32>? tile = null;
                 try
                 {
-                    tile = Image.Load<Rgba32>(bytes);
+                    var tile = Image.Load<Rgba32>(bytes);
                     var quad = Quads[i];
                     tile.Mutate(t => t.Resize(new ResizeOptions
                     {
@@ -71,21 +61,44 @@ public static class ThumbnailCompositor
                         Mode     = ResizeMode.Crop,
                         Position = AnchorPositionMode.Center,
                     }));
-                    ctx.DrawImage(tile, new Point(quad.X, quad.Y), opacity: 1f);
+                    tiles[i] = tile;
                 }
                 catch
                 {
                     // Ignore bad/corrupt child thumbnail; quadrant stays black.
                 }
-                finally
-                {
-                    tile?.Dispose();
-                }
             }
-        });
 
-        using var ms = new MemoryStream();
-        composite.SaveAsPng(ms);
-        return ms.ToArray();
+            using var composite = new Image<Rgba32>(ImageSize, ImageSize);
+
+            composite.Mutate(ctx =>
+            {
+                // Background: black
+                ctx.Fill(new Rgba32(0, 0, 0));
+
+                // Separator lines (white)
+                ctx.Fill(new Rgba32(255, 255, 255),
+                    new Rectangle(CellA, 0,    SepSize, ImageSize)); // vertical
+                ctx.Fill(new Rgba32(255, 255, 255),
+                    new Rectangle(0,    CellA, ImageSize, SepSize)); // horizontal
+
+                // Draw each quadrant
+                for (int i = 0; i < 4; i++)
+                {
+                    if (tiles[i] == null) continue;
+                    ctx.DrawImage(tiles[i]!, new Point(Quads[i].X, Quads[i].Y), opacity: 1f);
+                }
+            });
+
+            using var ms = new MemoryStream();
+            composite.SaveAsPng(ms);
+            return ms.ToArray();
+        }
+        finally
+        {
+            // Dispose all tiles after the composite is saved (or if an exception occurred).
+            foreach (var t in tiles)
+                t?.Dispose();
+        }
     }
 }
