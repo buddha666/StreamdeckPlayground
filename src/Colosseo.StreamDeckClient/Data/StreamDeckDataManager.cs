@@ -102,11 +102,11 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
 
         if (_cfg.IsInLiveMode)
         {
-            await _flowControlProvider.GoLiveAsync<TabEventComposition>(idEvent, _cfg.FlowSenderIdentifier);
+            await _flowControlProvider.GoLiveAsync<TabEvent>(idEvent, _cfg.FlowSenderIdentifier);
         }
         else
         {
-            await _flowControlProvider.EnqueueAsync<TabEventComposition>(idEvent, _cfg.FlowSenderIdentifier);
+            await _flowControlProvider.EnqueueAsync<TabEvent>(idEvent, _cfg.FlowSenderIdentifier);
         }
     }
 
