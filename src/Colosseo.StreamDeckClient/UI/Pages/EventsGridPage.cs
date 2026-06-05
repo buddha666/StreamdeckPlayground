@@ -100,63 +100,81 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
             quickEvents.Count > 0 ? quickEvents[^1].Id : 0
         );
 
-        if (_lastEventsHash.HasValue && _lastEventsHash.Value == eventsHash &&
-            _lastQuickHash.HasValue && _lastQuickHash.Value == quickHash)
-            return false;
+        bool hashChanged = !(
+            _lastEventsHash.HasValue && _lastEventsHash.Value == eventsHash &&
+            _lastQuickHash.HasValue && _lastQuickHash.Value == quickHash);
 
-        _lastEventsHash = eventsHash;
-        _lastQuickHash = quickHash;
-
-        // Build slot array
-        var slots = new ListItem[Columns * Rows];
-
-        // --- stop-action buttons ---
-        if (_cfg.StreamDeckShowStopButtons && StopCol >= 0)
+        if (!hashChanged)
         {
-            slots[0 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdTop, "HIDE OSD TOP");
-            slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdMiddle, "HIDE OSD MIDDLE");
-            slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdBottom, "HIDE OSD BOTTOM");
-            slots[3 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
-        }
-
-        // --- quick-tab events (first 4, placed by their PositionY) ---
-        if (_cfg.StreamDeckShowQuickTab && QuickCol >= 0)
-        {
-            foreach (var qe in quickEvents)
+            // Data unchanged. Re-trigger background loading only if some event slots are
+            // still in a loading state (e.g., the previous background pass was interrupted).
+            bool anyStillLoading;
+            lock (_slots)
             {
-                var item = BuildEventItem(qe, loadingThumb: true, isQuickTab: true);
-                // Here the PositionX/Y are already correct
-                if (item.PositionY < 0 || item.PositionY >= Rows)
-                    continue;
+                anyStillLoading = Array.Exists(_slots, s =>
+                    s is { IsThumbnailLoading: true } &&
+                    s.Kind is ListItemKind.EventSingle or ListItemKind.EventComposite);
+            }
+            if (!anyStillLoading)
+                return false;
+            // Fall through to restart the thumbnail loading pass for the pending slots.
+        }
+        else
+        {
+            _lastEventsHash = eventsHash;
+            _lastQuickHash = quickHash;
 
-                int ki = item.PositionY * Columns + QuickCol;
+            // Build slot array
+            var slots = new ListItem[Columns * Rows];
+
+            // --- stop-action buttons ---
+            if (_cfg.StreamDeckShowStopButtons && StopCol >= 0)
+            {
+                slots[0 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdTop, "HIDE OSD TOP");
+                slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdMiddle, "HIDE OSD MIDDLE");
+                slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdBottom, "HIDE OSD BOTTOM");
+                slots[3 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
+            }
+
+            // --- quick-tab events (first 4, placed by their PositionY) ---
+            if (_cfg.StreamDeckShowQuickTab && QuickCol >= 0)
+            {
+                foreach (var qe in quickEvents)
+                {
+                    var item = BuildEventItem(qe, loadingThumb: true, isQuickTab: true);
+                    // Here the PositionX/Y are already correct
+                    if (item.PositionY < 0 || item.PositionY >= Rows)
+                        continue;
+
+                    int ki = item.PositionY * Columns + QuickCol;
+                    slots[ki] = item;
+                }
+            }
+
+            // --- regular events ---
+            foreach (var e in events)
+            {
+                var item = BuildEventItem(e, loadingThumb: true);
+                int x = item.PositionX;
+                int y = item.PositionY;
+
+                if (x < 0 || x > MaxEventCol) continue;   // outside allowed event area
+                if (y < 0 || y >= Rows) continue;
+
+                int ki = y * Columns + x;
+                if (ki == KeyBack) continue;               // reserved for BACK
+                if (slots[ki] != null) continue;           // occupied by stop/quick column
+
                 slots[ki] = item;
             }
+
+            // Publish initial state (all items show "loading" for thumbnails)
+            lock (_slots)
+            {
+                Array.Copy(slots, _slots, slots.Length);
+            }
+            InvalidateAll();
         }
-
-        // --- regular events ---
-        foreach (var e in events)
-        {
-            var item = BuildEventItem(e, loadingThumb: true);
-            int x = item.PositionX;
-            int y = item.PositionY;
-
-            if (x < 0 || x > MaxEventCol) continue;   // outside allowed event area
-            if (y < 0 || y >= Rows) continue;
-
-            int ki = y * Columns + x;
-            if (ki == KeyBack) continue;               // reserved for BACK
-            if (slots[ki] != null) continue;           // occupied by stop/quick column
-
-            slots[ki] = item;
-        }
-
-        // Publish initial state (all items show "loading" for thumbnails)
-        lock (_slots)
-        {
-            Array.Copy(slots, _slots, slots.Length);
-        }
-        InvalidateAll();
 
         // Background thumbnail loading
         _ = Task.Run(async () =>
@@ -181,9 +199,12 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                 try
                 {
                     var thumbId = GetThumbEventId(capturedItem);
+                    // Always route composite events through _compositeThumbCache, even when
+                    // ChildEventIds is null/empty. Using _thumbCache (the fallback) is wrong
+                    // because composite event IDs and child TabEvent IDs share the same integer
+                    // space — a negative child entry can silently poison a composite lookup.
                     byte[] thumbBytes = capturedItem.Kind == ListItemKind.EventComposite
-                        && capturedItem.ChildEventIds is { Count: > 0 }
-                        ? await GetCompositeThumbnailCachedAsync(thumbId, capturedItem.ChildEventIds, ct).ConfigureAwait(false)
+                        ? await GetCompositeThumbnailCachedAsync(thumbId, capturedItem.ChildEventIds ?? Array.Empty<int>(), ct).ConfigureAwait(false)
                         : await GetThumbnailCachedAsync(thumbId, ct).ConfigureAwait(false);
                     var updated = new ListItem(
                     id: capturedItem.Id,
@@ -202,6 +223,11 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                     lock (_slots) { _slots[capturedKi] = updated; }
                     MarkKeyDirty(capturedKi);
                 }
+                catch
+                {
+                    // Leave the slot in IsThumbnailLoading=true so the stale-loading check
+                    // in the next RefreshAsync cycle can schedule another retry pass.
+                }
                 finally
                 {
                     gate.Release();
@@ -212,7 +238,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
             await Task.WhenAll(tasks);
         }, ct);
 
-        return true;
+        return hashChanged;
     }
 
     // ---- ScrollableListPage overrides ----
@@ -336,7 +362,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         return AwaitAndMarkNegativeAsync(_thumbCache, thumbEventId, entry, ct);
     }
 
-    private Task<byte[]> GetCompositeThumbnailCachedAsync(int compositeId, IReadOnlyList<int> childIds, CancellationToken ct)
+    private async Task<byte[]> GetCompositeThumbnailCachedAsync(int compositeId, IReadOnlyList<int> childIds, CancellationToken ct)
     {
         if (_compositeThumbCache.TryGetValue(compositeId, out var existing)
             && existing.IsNegative
@@ -353,7 +379,15 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
             return new CacheEntry(lazy, DateTimeOffset.UtcNow, IsNegative: false);
         });
 
-        return AwaitAndMarkNegativeAsync(_compositeThumbCache, compositeId, entry, ct);
+        var bytes = await AwaitAndMarkNegativeAsync(_compositeThumbCache, compositeId, entry, ct).ConfigureAwait(false);
+        if (bytes == null)
+        {
+            // FetchCompositeThumbnailBytesAsync should always produce valid bytes via
+            // ThumbnailCompositor.Build; a null result means a transient failure.
+            // Remove the negative entry so the next background pass can retry cleanly.
+            _compositeThumbCache.TryRemove(compositeId, out _);
+        }
+        return bytes;
     }
 
     private async Task<byte[]> AwaitAndMarkNegativeAsync(
