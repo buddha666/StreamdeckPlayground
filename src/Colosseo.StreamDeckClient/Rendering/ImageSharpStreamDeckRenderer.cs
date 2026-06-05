@@ -290,7 +290,7 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     var frameColor = new Rgba32(accent.R, accent.G, accent.B, 255);
 
     bool isComposite = item.Kind == ListItemKind.EventComposite;
-    var inner = isComposite ? GetCompositeInnerRect() : GetInnerRect();
+    var inner = GetInnerRect();
 
     var isLoadingThumb = item.IsThumbnailLoading;
     var hasThumbBytes = item.ThumbnailBytes is { Length: > 0 };
@@ -450,16 +450,6 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
   }
 
   private static Rectangle GetInnerRect()
-  {
-    var m = EventFrameInset + EventFrameThickness;
-    return new Rectangle(m, m, KeyWidth - (m * 2), KeyHeight - (m * 2));
-  }
-
-  /// <summary>
-  /// Inner rectangle for composite events — uses the same frame geometry as single events
-  /// (EventFrameInset + EventFrameThickness) so the white outer border has consistent thickness.
-  /// </summary>
-  private static Rectangle GetCompositeInnerRect()
   {
     var m = EventFrameInset + EventFrameThickness;
     return new Rectangle(m, m, KeyWidth - (m * 2), KeyHeight - (m * 2));
