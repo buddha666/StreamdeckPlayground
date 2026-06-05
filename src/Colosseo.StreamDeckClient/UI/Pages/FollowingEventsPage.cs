@@ -29,11 +29,6 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
     private readonly StreamDeckClientConfig _cfg;
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, CacheEntry> _thumbCache = new();
-    // Separate cache for composite thumbnails: prevents ID-space collisions with the
-    // single-event _thumbCache (child tab-event IDs and composite event IDs share the
-    // same integer space, so using one dictionary causes GetOrAdd to return a wrong or
-    // negative child-thumbnail entry when a composite event has the same ID as a child).
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, CacheEntry> _compositeThumbCache = new();
     private sealed record CacheEntry(Lazy<Task<byte[]>> LazyTask, DateTimeOffset CreatedAt, bool IsNegative);
     private static readonly TimeSpan NegativeTtl = TimeSpan.FromMinutes(10);
 
@@ -223,14 +218,9 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
                 {
                     try
                     {
-                        var thumbId = ParseEventId(capturedItem.Id);
-                        // Always route composite events through _compositeThumbCache, even when
-                        // ChildEventIds is null/empty. Using _thumbCache (the fallback) is wrong
-                        // because composite event IDs and child TabEvent IDs share the same integer
-                        // space — a negative child entry can silently poison a composite lookup.
                         byte[] thumbBytes = capturedItem.Kind == ListItemKind.EventComposite
-                            ? await GetCompositeThumbnailCachedAsync(thumbId, capturedItem.ChildEventIds ?? Array.Empty<int>(), ct).ConfigureAwait(false)
-                            : await GetThumbnailCachedAsync(thumbId, ct).ConfigureAwait(false);
+                            ? await FetchCompositeThumbnailBytesAsync(capturedItem.ChildEventIds ?? Array.Empty<int>(), ct).ConfigureAwait(false)
+                            : await GetThumbnailCachedAsync(ParseEventId(capturedItem.Id), ct).ConfigureAwait(false);
                         var updated = new ListItem(
                             id: capturedItem.Id,
                             title: capturedItem.Title,
@@ -369,34 +359,6 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
         });
 
         return AwaitAndMarkNegativeAsync(_thumbCache, thumbEventId, entry, ct);
-    }
-
-    private async Task<byte[]> GetCompositeThumbnailCachedAsync(int compositeId, IReadOnlyList<int> childIds, CancellationToken ct)
-    {
-        if (_compositeThumbCache.TryGetValue(compositeId, out var existing)
-            && existing.IsNegative
-            && (DateTimeOffset.UtcNow - existing.CreatedAt) > NegativeTtl)
-        {
-            _compositeThumbCache.TryRemove(compositeId, out _);
-        }
-
-        var entry = _compositeThumbCache.GetOrAdd(compositeId, _ =>
-        {
-            var lazy = new Lazy<Task<byte[]>>(
-                () => FetchCompositeThumbnailBytesAsync(childIds, CancellationToken.None),
-                isThreadSafe: true);
-            return new CacheEntry(lazy, DateTimeOffset.UtcNow, IsNegative: false);
-        });
-
-        var bytes = await AwaitAndMarkNegativeAsync(_compositeThumbCache, compositeId, entry, ct).ConfigureAwait(false);
-        if (bytes == null)
-        {
-            // FetchCompositeThumbnailBytesAsync should always produce valid bytes via
-            // ThumbnailCompositor.Build; a null result means a transient failure.
-            // Remove the negative entry so the next background pass can retry cleanly.
-            _compositeThumbCache.TryRemove(compositeId, out _);
-        }
-        return bytes;
     }
 
     private async Task<byte[]> AwaitAndMarkNegativeAsync(
