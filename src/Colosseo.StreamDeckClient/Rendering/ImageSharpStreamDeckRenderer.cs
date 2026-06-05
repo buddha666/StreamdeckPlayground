@@ -324,14 +324,9 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     {
       if (isComposite)
       {
-        // Composite: accent background fills the full key, then a black inset ring is drawn
-        // on top (identical to RenderClassicItem).  The inner area intentionally stays
-        // accent-coloured so the black ring (pixels 4..7) is visually distinguishable
-        // from the surrounding accent area — filling the inner area with black would make
-        // the ring invisible (black-on-black).  The thumbnail/loading placeholder below
-        // covers the inner area when present.
-        ctx.Fill(frameColor);
-        ctx.DrawInsetBorder(new Rgba32(0, 0, 0, 255), thickness: 4, inset: 4, width: KeyWidth, height: KeyHeight);
+        // Composite: white outer frame (same thickness as single-event accent frame), black inner area.
+        ctx.Fill(new Rgba32(255, 255, 255, 255));
+        ctx.Fill(new Rgba32(0, 0, 0, 255), inner);
       }
       else
       {
@@ -461,12 +456,12 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
   }
 
   /// <summary>
-  /// Inner rectangle for composite events whose outer border matches classic TabEvents
-  /// (DrawInsetBorder with inset=4, thickness=4 → content starts at offset 8).
+  /// Inner rectangle for composite events — uses the same frame geometry as single events
+  /// (EventFrameInset + EventFrameThickness) so the white outer border has consistent thickness.
   /// </summary>
   private static Rectangle GetCompositeInnerRect()
   {
-    const int m = 4 + 4; // inset(4) + thickness(4) matching RenderClassicItem border
+    var m = EventFrameInset + EventFrameThickness;
     return new Rectangle(m, m, KeyWidth - (m * 2), KeyHeight - (m * 2));
   }
 
