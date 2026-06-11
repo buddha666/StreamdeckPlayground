@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using OpenMacroBoard.SDK;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using StreamDeckSharp;
@@ -23,6 +24,12 @@ public sealed class StreamDeckDeviceConnection : IStreamDeckDeviceConnection
   public bool IsConnected => _device != null;
   public int KeyCount { get; private set; }
 
+  /// <inheritdoc/>
+  public int Columns { get; private set; }
+
+  /// <inheritdoc/>
+  public int Rows { get; private set; }
+
   public Task ConnectAsync(CancellationToken ct)
   {
     ct.ThrowIfCancellationRequested();
@@ -35,10 +42,25 @@ public sealed class StreamDeckDeviceConnection : IStreamDeckDeviceConnection
 
     KeyCount = _device.Keys.Count;
 
+    // Detect grid dimensions by counting distinct X and Y positions across all keys.
+    // OpenMacroBoard KeyPosition.X / .Y are pixel-unit positions; keys in the same column
+    // share the same X value, keys in the same row share the same Y value.
+    var xSet = new HashSet<int>();
+    var ySet = new HashSet<int>();
+    for (int i = 0; i < _device.Keys.Count; i++)
+    {
+      xSet.Add(_device.Keys[i].X);
+      ySet.Add(_device.Keys[i].Y);
+    }
+
+    Columns = xSet.Count > 0 ? xSet.Count : 8;
+    Rows    = ySet.Count  > 0 ? ySet.Count  : 4;
+
+    _logger.LogInformation("Connected. Keys={KeyCount}, Grid={Cols}×{Rows}", KeyCount, Columns, Rows);
+
     // Event z OpenMacroBoard SDK
     _device.KeyStateChanged += DeviceOnKeyStateChanged;
 
-    _logger.LogInformation("Connected. Keys={KeyCount}", KeyCount);
     return Task.CompletedTask;
   }
 

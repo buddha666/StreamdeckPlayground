@@ -11,5 +11,10 @@
     StopOsdMiddle = 6,
     StopOsdBottom = 7,
     StopAllActions = 8,
+    /// <summary>
+    /// Navigation button shown in the stop column on 3-row devices.
+    /// Pressing it opens the <c>HideOsdSubPage</c> where the individual OSD hide buttons are displayed.
+    /// </summary>
+    HideOsdMenu = 9,
   }
 }

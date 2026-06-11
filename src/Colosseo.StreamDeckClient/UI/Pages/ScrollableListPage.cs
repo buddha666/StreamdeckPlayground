@@ -3,26 +3,36 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Colosseo.StreamDeckClient.Device;
 
 namespace Colosseo.StreamDeckClient.UI.Pages;
 
 public abstract class ScrollableListPage
 {
-  public const int Columns = 8;
-  public const int Rows = 4;
-  public const int ReservedCol = 7;
+  // ---- Dynamic layout ----
 
   /// <summary>
-  /// When true (default) column 7 is reserved for UP / DOWN / Info / Back navigation controls.
-  /// Override to false in pages that want all 8 columns filled with content items.
+  /// Device layout providing dynamic rows/columns.
+  /// Subclasses should assign this in their constructor (before any dirty-key operations).
+  /// Defaults to the 8×4 Stream Deck XL layout.
+  /// </summary>
+  public DeviceLayout Layout { get; protected set; } = DeviceLayout.Default;
+
+  public int Columns => Layout.Columns;
+  public int Rows    => Layout.Rows;
+  public int ReservedCol => Layout.Columns - 1;
+
+  /// <summary>
+  /// When true (default) column (Columns-1) is reserved for UP / DOWN / Info / Back navigation controls.
+  /// Override to false in pages that want all columns filled with content items.
   /// </summary>
   public virtual bool ShowNavigationControls => true;
 
   /// <summary>
   /// Number of content items per page.
-  /// Standard pages (ShowNavigationControls=true): 7 columns × 4 rows = 28.
-  /// Full-grid pages with back key (ShowNavigationControls=false, KeyBack ≥ 0): 8 × 4 − 1 = 31.
-  /// Full-grid pages without back key (ShowNavigationControls=false, KeyBack &lt; 0): 8 × 4 = 32.
+  /// Standard pages (ShowNavigationControls=true): (Columns-1) × Rows.
+  /// Full-grid pages with back key (ShowNavigationControls=false, KeyBack ≥ 0): Columns × Rows − 1.
+  /// Full-grid pages without back key (ShowNavigationControls=false, KeyBack &lt; 0): Columns × Rows.
   /// </summary>
   public int PageSize => ShowNavigationControls
       ? (Columns - 1) * Rows
@@ -147,7 +157,7 @@ public abstract class ScrollableListPage
         return itemIndex < _items.Count ? itemIndex : (int?)null;
       }
 
-      // Standard scroll-list: column 7 is reserved for navigation keys.
+      // Standard scroll-list: last column is reserved for navigation keys.
       var col = keyIndex % Columns;
       var row = keyIndex / Columns;
 
@@ -163,16 +173,15 @@ public abstract class ScrollableListPage
 
   // ---- Navigation keys ----
 
-  public int KeyScrollUp { get { return 7; } }
-  public int KeyScrollDown { get { return 15; } }
-  public int KeyInfo { get { return 23; } }
+  public int KeyScrollUp => Layout.KeyScrollUp;
+  public int KeyScrollDown => Layout.KeyScrollDown;
+  public int KeyInfo => Layout.KeyInfo;
 
   /// <summary>
-  /// Index of the BACK key. Default is 31 (bottom-right). Override to move it
-  /// to a different position (e.g. 24 for bottom-left). Use -1 for no back button
-  /// (root pages that have nowhere to go back to).
+  /// Index of the BACK key. Defaults to bottom-right (last key). Override to move it
+  /// to a different position (e.g. bottom-left). Use -1 for no back button.
   /// </summary>
-  public virtual int KeyBack { get { return 31; } }
+  public virtual int KeyBack => Layout.KeyBackDefault;
 
   // ---- Dirty-key tracking ----
 
@@ -213,7 +222,7 @@ public abstract class ScrollableListPage
   private void MarkAllDirty_NoLock()
   {
     _dirtyKeys.Clear();
-    for (int i = 0; i < Columns * Rows; i++)
+    for (int i = 0; i < Layout.TotalKeys; i++)
       _dirtyKeys.Add(i);
   }
 

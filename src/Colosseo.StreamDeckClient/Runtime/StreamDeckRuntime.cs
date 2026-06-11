@@ -62,13 +62,18 @@ public sealed class StreamDeckRuntime
       await _device.ConnectAsync(ct);
       _device.KeyStateChanged += OnKeyStateChanged;
 
+      // Build the layout from the connected device's grid dimensions.
+      var layout = new DeviceLayout(_device.Columns, _device.Rows);
+      _logger.LogInformation("Device layout: {Cols}×{Rows} ({Total} keys, IsThreeRow={IsThree})",
+          layout.Columns, layout.Rows, layout.TotalKeys, layout.IsThreeRow);
+
       await _device.ClearAsync(ct);
       await _device.SetBrightnessAsync(50, ct);
 
       if (_cfg.Value.Mode == StreamDeckMode.Following)
-        _nav.SetRoot(new FollowingEventsPage(_dataManager, _selectedTab, _cfg.Value));
+        _nav.SetRoot(new FollowingEventsPage(_dataManager, _selectedTab, _nav, _cfg.Value, layout));
       else
-        _nav.SetRoot(new BanksPage(_dataManager, _nav, _cfg));
+        _nav.SetRoot(new BanksPage(_dataManager, _nav, _cfg, layout));
 
       await RefreshCurrentPageIfNeededAsync(force: true, ct);
 

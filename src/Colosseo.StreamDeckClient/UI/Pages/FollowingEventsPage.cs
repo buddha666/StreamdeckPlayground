@@ -1,7 +1,9 @@
 using Colosseo.Flow.Domain.DomainClasses;
 using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
+using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Rendering;
+using Colosseo.StreamDeckClient.UI.Navigation;
 using Monogram.Sport.FlowBLL.Enums;
 using System;
 using System.Collections.Generic;
@@ -16,9 +18,11 @@ namespace Colosseo.StreamDeckClient.UI.Pages;
 /// <summary>
 /// Following-mode events page: shows events for the tab that is currently selected
 /// in <see cref="ISelectedTabProvider"/> without any navigation stack or BACK button.
-/// All 32 keys are available for event slots, stop buttons, and the quick-tab column.
+/// All keys are available for event slots, stop buttons, and the quick-tab column.
 /// The page re-renders automatically whenever <see cref="ISelectedTabProvider.SelectedTabId"/>
 /// or <see cref="ISelectedTabProvider.SelectedBankId"/> changes.
+/// On 3-row devices the stop column shows a HIDE OSD navigation button (above STOP ACTIONS)
+/// that opens <see cref="HideOsdSubPage"/> for the individual OSD-hide buttons.
 /// </summary>
 public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
 {
@@ -26,6 +30,7 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
 
     private readonly IStreamDeckDataManager _data;
     private readonly ISelectedTabProvider _selectedTab;
+    private readonly INavigationService _nav;
     private readonly StreamDeckOptions _cfg;
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Task<byte[]>> _thumbCache = new();
@@ -37,34 +42,41 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
     private int? _trackedTabId;
     private int? _trackedBankId;
 
-    // Flat array of slots, indexed by keyIndex (0..31). Null means empty.
-    private readonly ListItem[] _slots = new ListItem[Columns * Rows];
+    // Flat array of slots, indexed by keyIndex (0..TotalKeys-1). Null means empty.
+    private readonly ListItem[] _slots;
 
     public FollowingEventsPage(
         IStreamDeckDataManager data,
         ISelectedTabProvider selectedTab,
-        StreamDeckOptions cfg)
+        INavigationService nav,
+        StreamDeckOptions cfg,
+        DeviceLayout layout = null)
     {
+        Layout = layout ?? DeviceLayout.Default;
+        _slots = new ListItem[Layout.TotalKeys];
+
         _data = data;
         _selectedTab = selectedTab;
+        _nav = nav;
         _cfg = cfg;
     }
 
     // ---- layout ----
 
-    // No BACK button: position 24 (bottom-left) is available for a regular event.
+    // No BACK button: following mode is a root page, the user never goes back from it.
     public override int KeyBack => -1;
 
-    // No UP/DOWN/INFO navigation column — all 8 columns are content.
+    // No UP/DOWN/INFO navigation column — all columns are content.
     public override bool ShowNavigationControls => false;
 
-    private int StopCol => _cfg.ShowStopButtons ? (Columns - 1) : -1;         // 7 or -1
-    private int QuickCol => _cfg.ShowQuickTab                                  // 6, 7, or -1
+    private int StopCol => _cfg.ShowStopButtons ? (Columns - 1) : -1;
+    private int QuickCol => _cfg.ShowQuickTab
         ? (_cfg.ShowStopButtons ? Columns - 2 : Columns - 1)
         : -1;
-    private int MaxEventCol => Columns - 1                                               // 5, 6, or 7
+    private int MaxEventCol => Columns - 1
         - (_cfg.ShowStopButtons ? 1 : 0)
         - (_cfg.ShowQuickTab ? 1 : 0);
+
     // ---- IRefreshablePage ----
 
     public async Task<bool> RefreshAsync(CancellationToken ct)
@@ -107,7 +119,6 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
         var events = await eventsTask;
         var quickEvents = await quickTask;
 
-        // Hash check: if neither list changed, leave _slots as-is so loaded thumbnails persist.
         var eventsHash = HashCode.Combine(
             events.Count,
             events.Count > 0 ? events[0].Id : 0,
@@ -125,8 +136,6 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
 
         if (!hashChanged)
         {
-            // Data unchanged. Re-trigger background loading only if some event slots are
-            // still in a loading state (e.g., the previous background pass was interrupted).
             bool anyStillLoading;
             lock (_slots)
             {
@@ -136,26 +145,34 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
             }
             if (!anyStillLoading)
                 return false;
-            // Fall through to restart the thumbnail loading pass for the pending slots.
         }
         else
         {
             _lastEventsHash = eventsHash;
             _lastQuickHash = quickHash;
 
-            // Build slot array.
-            var slots = new ListItem[Columns * Rows];
+            var slots = new ListItem[Layout.TotalKeys];
 
             // --- stop-action buttons ---
             if (_cfg.ShowStopButtons && StopCol >= 0)
             {
-                slots[0 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdTop, "HIDE OSD TOP");
-                slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdMiddle, "HIDE OSD MIDDLE");
-                slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdBottom, "HIDE OSD BOTTOM");
-                slots[3 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
+                if (Layout.IsThreeRow)
+                {
+                    // 3-row layout: bottom = STOP ACTIONS, above it = HIDE OSD navigation button.
+                    // Row 0 of the stop column remains empty.
+                    slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.HideOsdMenu, "HIDE OSD");
+                    slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
+                }
+                else
+                {
+                    slots[0 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdTop,    "HIDE OSD TOP");
+                    slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdMiddle, "HIDE OSD MIDDLE");
+                    slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdBottom, "HIDE OSD BOTTOM");
+                    slots[3 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
+                }
             }
 
-            // --- quick-tab events (placed by their PositionY) ---
+            // --- quick-tab events (placed by their PositionY, bounded by Rows) ---
             if (_cfg.ShowQuickTab && QuickCol >= 0)
             {
                 foreach (var qe in quickEvents)
@@ -169,23 +186,21 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
             }
 
             // --- regular events ---
-            // KeyBack == -1 so no slot is reserved for navigation — all positions are fair game.
             foreach (var e in events)
             {
                 var item = BuildEventItem(e, loadingThumb: true);
                 int x = item.PositionX;
                 int y = item.PositionY;
 
-                if (x < 0 || x > MaxEventCol) continue;   // outside allowed event area
+                if (x < 0 || x > MaxEventCol) continue;
                 if (y < 0 || y >= Rows) continue;
 
                 int ki = y * Columns + x;
-                if (slots[ki] != null) continue;            // occupied by stop/quick column
+                if (slots[ki] != null) continue;
 
                 slots[ki] = item;
             }
 
-            // Publish initial state (thumbnails show "loading" placeholder).
             lock (_slots)
             {
                 Array.Copy(slots, _slots, slots.Length);
@@ -256,15 +271,14 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
 
     public override bool TryGetItemByKeyIndex(int keyIndex, out ListItem item)
     {
-        lock (_slots) { item = _slots[keyIndex]; }
-        // Return true for every key index — this page handles ALL slots itself.
+        lock (_slots) { item = (keyIndex >= 0 && keyIndex < _slots.Length) ? _slots[keyIndex] : null; }
         return true;
     }
 
     public override async Task OnKeyDownAsync(int keyIndex, CancellationToken ct)
     {
         ListItem item;
-        lock (_slots) { item = _slots[keyIndex]; }
+        lock (_slots) { item = (keyIndex >= 0 && keyIndex < _slots.Length) ? _slots[keyIndex] : null; }
         if (item == null) return;
 
         switch (item.Kind)
@@ -286,6 +300,10 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
                 break;
             case ListItemKind.StopAllActions:
                 await _data.StopAction(ct);
+                break;
+            case ListItemKind.HideOsdMenu:
+                // 3-row device: open the OSD sub-page.
+                _nav.Push(new HideOsdSubPage(_data, _nav, _cfg, Layout));
                 break;
         }
     }

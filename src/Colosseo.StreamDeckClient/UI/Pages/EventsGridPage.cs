@@ -1,6 +1,7 @@
 using Colosseo.Flow.Domain.DomainClasses;
 using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
+using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
 using Monogram.Sport.FlowBLL.Enums;
@@ -17,7 +18,10 @@ namespace Colosseo.StreamDeckClient.UI.Pages;
 
 /// <summary>
 /// Events grid page: events are placed at their (PositionX, PositionY) coordinates
-/// instead of being listed sequentially. The grid is 8×4 (cols×rows).
+/// instead of being listed sequentially.
+/// Supports any device grid (columns × rows) via <see cref="DeviceLayout"/>.
+/// On 3-row devices the stop column shows a HIDE OSD navigation button (above STOP ACTIONS)
+/// that opens <see cref="HideOsdSubPage"/> for the individual OSD-hide buttons.
 /// </summary>
 public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
 {
@@ -35,9 +39,9 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
     private int? _lastEventsHash;
     private int? _lastQuickHash;
 
-    // Flat array of slots, indexed by keyIndex (0..31).
-    // Null means an empty slot (nothing rendered there except BACK for index 24).
-    private readonly ListItem[] _slots = new ListItem[Columns * Rows];
+    // Flat array of slots, indexed by keyIndex (0..TotalKeys-1).
+    // Null means an empty slot (nothing rendered there except BACK for KeyBack).
+    private readonly ListItem[] _slots;
 
     public EventsGridPage(
         IStreamDeckDataManager data,
@@ -45,8 +49,12 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         int bankId,
         int tabId,
         string tabName,
-        StreamDeckOptions cfg)
+        StreamDeckOptions cfg,
+        DeviceLayout layout = null)
     {
+        Layout = layout ?? DeviceLayout.Default;
+        _slots = new ListItem[Layout.TotalKeys];
+
         _data = data;
         _nav = nav;
         _bankId = bankId;
@@ -55,16 +63,16 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         _cfg = cfg;
     }
 
-    // ---- layout constants ----
+    // ---- layout ----
 
-    // BACK button lives at bottom-left: x=0, y=3 → keyIndex = 3*8+0 = 24
-    public override int KeyBack => 24;
+    // BACK button lives at bottom-left
+    public override int KeyBack => Layout.KeyBackBottomLeft;
 
-    private int StopCol => _cfg.ShowStopButtons ? (Columns - 1) : -1;          // 7 or -1
-    private int QuickCol => _cfg.ShowQuickTab                                   // 6, 7, or -1
+    private int StopCol => _cfg.ShowStopButtons ? (Columns - 1) : -1;
+    private int QuickCol => _cfg.ShowQuickTab
         ? (_cfg.ShowStopButtons ? Columns - 2 : Columns - 1)
         : -1;
-    private int MaxEventCol => Columns - 1                                                // 5, 6, or 7
+    private int MaxEventCol => Columns - 1
         - (_cfg.ShowStopButtons ? 1 : 0)
         - (_cfg.ShowQuickTab ? 1 : 0);
 
@@ -100,8 +108,6 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
 
         if (!hashChanged)
         {
-            // Data unchanged. Re-trigger background loading only if some event slots are
-            // still in a loading state (e.g., the previous background pass was interrupted).
             bool anyStillLoading;
             lock (_slots)
             {
@@ -111,32 +117,40 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
             }
             if (!anyStillLoading)
                 return false;
-            // Fall through to restart the thumbnail loading pass for the pending slots.
         }
         else
         {
             _lastEventsHash = eventsHash;
             _lastQuickHash = quickHash;
 
-            // Build slot array
-            var slots = new ListItem[Columns * Rows];
+            var slots = new ListItem[Layout.TotalKeys];
 
             // --- stop-action buttons ---
             if (_cfg.ShowStopButtons && StopCol >= 0)
             {
-                slots[0 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdTop, "HIDE OSD TOP");
-                slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdMiddle, "HIDE OSD MIDDLE");
-                slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdBottom, "HIDE OSD BOTTOM");
-                slots[3 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
+                if (Layout.IsThreeRow)
+                {
+                    // 3-row layout: bottom = STOP ACTIONS, above it = HIDE OSD navigation button.
+                    // Row 0 of the stop column remains empty.
+                    slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.HideOsdMenu, "HIDE OSD");
+                    slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
+                }
+                else
+                {
+                    // 4+ row layout: all four OSD/stop buttons are visible directly.
+                    slots[0 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdTop,    "HIDE OSD TOP");
+                    slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdMiddle, "HIDE OSD MIDDLE");
+                    slots[2 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdBottom, "HIDE OSD BOTTOM");
+                    slots[3 * Columns + StopCol] = MakeStopItem(ListItemKind.StopAllActions, "STOP ACTIONS");
+                }
             }
 
-            // --- quick-tab events (first 4, placed by their PositionY) ---
+            // --- quick-tab events (placed by their PositionY, bounded by Rows) ---
             if (_cfg.ShowQuickTab && QuickCol >= 0)
             {
                 foreach (var qe in quickEvents)
                 {
                     var item = BuildEventItem(qe, loadingThumb: true, isQuickTab: true);
-                    // Here the PositionX/Y are already correct
                     if (item.PositionY < 0 || item.PositionY >= Rows)
                         continue;
 
@@ -152,17 +166,16 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                 int x = item.PositionX;
                 int y = item.PositionY;
 
-                if (x < 0 || x > MaxEventCol) continue;   // outside allowed event area
+                if (x < 0 || x > MaxEventCol) continue;
                 if (y < 0 || y >= Rows) continue;
 
                 int ki = y * Columns + x;
-                if (ki == KeyBack) continue;               // reserved for BACK
-                if (slots[ki] != null) continue;           // occupied by stop/quick column
+                if (ki == KeyBack) continue;
+                if (slots[ki] != null) continue;
 
                 slots[ki] = item;
             }
 
-            // Publish initial state (all items show "loading" for thumbnails)
             lock (_slots)
             {
                 Array.Copy(slots, _slots, slots.Length);
@@ -236,9 +249,8 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
     {
         lock (_slots)
         {
-            item = _slots[keyIndex];
+            item = (keyIndex >= 0 && keyIndex < _slots.Length) ? _slots[keyIndex] : null;
         }
-        // Return true for every key index — this page handles ALL slots itself.
         return true;
     }
 
@@ -251,7 +263,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         }
 
         ListItem item;
-        lock (_slots) { item = _slots[keyIndex]; }
+        lock (_slots) { item = (keyIndex >= 0 && keyIndex < _slots.Length) ? _slots[keyIndex] : null; }
         if (item == null) return;
 
         switch (item.Kind)
@@ -273,6 +285,10 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                 break;
             case ListItemKind.StopAllActions:
                 await _data.StopAction(ct);
+                break;
+            case ListItemKind.HideOsdMenu:
+                // 3-row device: open the OSD sub-page where the individual hide buttons are shown.
+                _nav.Push(new HideOsdSubPage(_data, _nav, _cfg, Layout));
                 break;
         }
     }
@@ -326,7 +342,6 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
 
     private static int GetThumbEventId(ListItem item)
     {
-        // Id is "S:123" or "C:123"
         return int.Parse(item.Id.Substring(2));
     }
 
@@ -336,7 +351,6 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
 
     private Task<byte[]> GetThumbnailCachedAsync(int tabEventId)
     {
-        // If a previously cached task faulted or returned null, evict it so next call retries.
         if (_thumbCache.TryGetValue(tabEventId, out var existing)
             && existing.IsCompleted
             && (existing.IsFaulted || existing.IsCanceled

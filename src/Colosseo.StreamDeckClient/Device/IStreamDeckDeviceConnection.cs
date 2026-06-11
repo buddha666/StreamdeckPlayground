@@ -12,6 +12,12 @@ namespace Colosseo.StreamDeckClient.Device
     bool IsConnected { get; }
     int KeyCount { get; }
 
+    /// <summary>Number of key columns detected from the connected device (valid after <see cref="ConnectAsync"/>).</summary>
+    int Columns { get; }
+
+    /// <summary>Number of key rows detected from the connected device (valid after <see cref="ConnectAsync"/>).</summary>
+    int Rows { get; }
+
     Task ConnectAsync(CancellationToken ct);
     Task SetBrightnessAsync(byte percent, CancellationToken ct);
     Task ClearAsync(CancellationToken ct);

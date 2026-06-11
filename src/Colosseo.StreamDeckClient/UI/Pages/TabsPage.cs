@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
+using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
 using Microsoft.Extensions.Options;
@@ -21,8 +22,9 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
 
   private int? _lastHash;
 
-  public TabsPage(IStreamDeckDataManager data, INavigationService nav, int bankId, string bankName, IOptions<StreamDeckOptions> cfg)
+  public TabsPage(IStreamDeckDataManager data, INavigationService nav, int bankId, string bankName, IOptions<StreamDeckOptions> cfg, DeviceLayout layout = null)
   {
+    Layout = layout ?? DeviceLayout.Default;
     _data = data;
     _nav = nav;
     _bankId = bankId;
@@ -37,8 +39,8 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
 
   public override bool ShowNavigationControls => false;
 
-  // BACK button is in the bottom-left corner (x=0, y=3 → keyIndex=24)
-  public override int KeyBack => 24;
+  // BACK button at bottom-left (position depends on device grid)
+  public override int KeyBack => Layout.KeyBackBottomLeft;
 
   public async Task<bool> RefreshAsync(CancellationToken ct)
   {
@@ -81,7 +83,7 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
     var tabId = int.Parse(item.Id);
     var tabName = item.Title;
 
-    _nav.Push(new EventsGridPage(_data, _nav, _bankId, tabId, tabName, _cfg.Value));
+    _nav.Push(new EventsGridPage(_data, _nav, _bankId, tabId, tabName, _cfg.Value, Layout));
     return Task.CompletedTask;
   }
 

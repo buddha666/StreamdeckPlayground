@@ -261,7 +261,8 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     if (item.Kind is ListItemKind.StopOsdTop
         or ListItemKind.StopOsdMiddle
         or ListItemKind.StopOsdBottom
-        or ListItemKind.StopAllActions)
+        or ListItemKind.StopAllActions
+        or ListItemKind.HideOsdMenu)
     {
       RenderStopItem(keyIndex, item);
     }
@@ -282,9 +283,13 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
 
     using var img = new Image<Rgba32>(KeyWidth, KeyHeight);
 
-    var bg = item.Kind == ListItemKind.StopAllActions
-        ? new Rgba32(160, 20, 20)
-        : new Rgba32(100, 30, 0);
+    Rgba32 bg;
+    if (item.Kind == ListItemKind.StopAllActions)
+      bg = new Rgba32(160, 20, 20);    // dark red — stop all actions
+    else if (item.Kind == ListItemKind.HideOsdMenu)
+      bg = new Rgba32(80, 50, 0);     // dark amber — opens OSD sub-menu
+    else
+      bg = new Rgba32(100, 30, 0);    // dark orange — individual OSD hide buttons
 
     var border = new Rgba32(220, 80, 0);
 

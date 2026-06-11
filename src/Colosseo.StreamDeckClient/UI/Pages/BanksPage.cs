@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
+using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
 using Microsoft.Extensions.Options;
@@ -19,8 +20,9 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
 
   private int? _lastHash;
 
-  public BanksPage(IStreamDeckDataManager data, INavigationService nav, IOptions<StreamDeckOptions> cfg)
+  public BanksPage(IStreamDeckDataManager data, INavigationService nav, IOptions<StreamDeckOptions> cfg, DeviceLayout layout = null)
   {
+    Layout = layout ?? DeviceLayout.Default;
     _data = data;
     _nav = nav;
     _cfg = cfg;
@@ -73,7 +75,7 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
     var bankId = int.Parse(item.Id);
     var bankName = item.Title;
 
-    _nav.Push(new TabsPage(_data, _nav, bankId, bankName, _cfg));
+    _nav.Push(new TabsPage(_data, _nav, bankId, bankName, _cfg, Layout));
     return Task.CompletedTask;
   }
 
