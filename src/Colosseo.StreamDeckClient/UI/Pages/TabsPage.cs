@@ -1,12 +1,13 @@
-﻿using Colosseo.StreamDeckClient.Config;
-using Colosseo.StreamDeckClient.Data;
-using Colosseo.StreamDeckClient.Rendering;
-using Colosseo.StreamDeckClient.UI.Navigation;
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Colosseo.StreamDeckClient.Config;
+using Colosseo.StreamDeckClient.Data;
+using Colosseo.StreamDeckClient.Rendering;
+using Colosseo.StreamDeckClient.UI.Navigation;
+using Microsoft.Extensions.Options;
 
 namespace Colosseo.StreamDeckClient.UI.Pages;
 
@@ -16,11 +17,11 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
   private readonly INavigationService _nav;
   private readonly int _bankId;
   private readonly string _bankName;
-  private readonly StreamDeckClientConfig _cfg;
+  private readonly IOptions<StreamDeckOptions> _cfg;
 
   private int? _lastHash;
 
-  public TabsPage(IStreamDeckDataManager data, INavigationService nav, int bankId, string bankName, StreamDeckClientConfig cfg)
+  public TabsPage(IStreamDeckDataManager data, INavigationService nav, int bankId, string bankName, IOptions<StreamDeckOptions> cfg)
   {
     _data = data;
     _nav = nav;
@@ -80,7 +81,7 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
     var tabId = int.Parse(item.Id);
     var tabName = item.Title;
 
-    _nav.Push(new EventsGridPage(_data, _nav, _bankId, tabId, tabName, _cfg));
+    _nav.Push(new EventsGridPage(_data, _nav, _bankId, tabId, tabName, _cfg.Value));
     return Task.CompletedTask;
   }
 

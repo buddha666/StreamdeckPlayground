@@ -1,14 +1,13 @@
-﻿using Colosseo.Flow.Domain.DomainClasses;
-using Colosseo.StreamDeckClient.Config;
-using Colosseo.StreamDeckClient.Data;
-using Colosseo.StreamDeckClient.Rendering;
-using Colosseo.StreamDeckClient.UI.Navigation;
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
+using Colosseo.StreamDeckClient.Config;
+using Colosseo.StreamDeckClient.Data;
+using Colosseo.StreamDeckClient.Rendering;
+using Colosseo.StreamDeckClient.UI.Navigation;
+using Microsoft.Extensions.Options;
 
 namespace Colosseo.StreamDeckClient.UI.Pages;
 
@@ -16,11 +15,11 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
 {
   private readonly IStreamDeckDataManager _data;
   private readonly INavigationService _nav;
-  private readonly StreamDeckClientConfig _cfg;
+  private readonly IOptions<StreamDeckOptions> _cfg;
 
   private int? _lastHash;
 
-  public BanksPage(IStreamDeckDataManager data, INavigationService nav, StreamDeckClientConfig cfg)
+  public BanksPage(IStreamDeckDataManager data, INavigationService nav, IOptions<StreamDeckOptions> cfg)
   {
     _data = data;
     _nav = nav;

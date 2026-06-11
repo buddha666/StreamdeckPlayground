@@ -1,14 +1,15 @@
-﻿using Colosseo.StreamDeckClient.Config;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
+using Colosseo.StreamDeckClient.Config;
 using Colosseo.StreamDeckClient.Data;
 using Colosseo.StreamDeckClient.Device;
 using Colosseo.StreamDeckClient.Rendering;
 using Colosseo.StreamDeckClient.UI.Navigation;
 using Colosseo.StreamDeckClient.UI.Pages;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 
 namespace Colosseo.StreamDeckClient.Runtime;
 
@@ -20,7 +21,7 @@ public sealed class StreamDeckRuntime
   private readonly INavigationService _nav;
   private readonly IStreamDeckRenderer _renderer;
   private readonly ILogger<StreamDeckRuntime> _logger;
-  private readonly StreamDeckClientConfig _cfg;
+  private readonly IOptions<StreamDeckOptions> _cfg;
 
   private readonly ConcurrentQueue<KeyStateChangedEventArgs> _inputQueue = new();
 
@@ -36,7 +37,7 @@ public sealed class StreamDeckRuntime
     ISelectedTabProvider selectedTab,
     INavigationService navigationService,
     IStreamDeckRenderer renderer,
-    StreamDeckClientConfig cfg,
+    IOptions<StreamDeckOptions> cfg,
     ILogger<StreamDeckRuntime> logger)
   {
     _device = device;
@@ -64,8 +65,8 @@ public sealed class StreamDeckRuntime
       await _device.ClearAsync(ct);
       await _device.SetBrightnessAsync(50, ct);
 
-      if (_cfg.StreamDeckModeIsFollowing)
-        _nav.SetRoot(new FollowingEventsPage(_dataManager, _selectedTab, _cfg));
+      if (_cfg.Value.Mode == StreamDeckMode.Following)
+        _nav.SetRoot(new FollowingEventsPage(_dataManager, _selectedTab, _cfg.Value));
       else
         _nav.SetRoot(new BanksPage(_dataManager, _nav, _cfg));
 

@@ -17,9 +17,9 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
     private readonly IFlowDataProvider _flowDataProvider;
     private readonly ILogger<StreamDeckDataManager> _logger;
     private readonly IFlowControlProvider _flowControlProvider;
-    private readonly StreamDeckClientConfig _cfg;
+    private readonly StreamDeckOptions _cfg;
 
-    public StreamDeckDataManager(IFlowDataProvider flow, IFlowControlProvider flowControlProvider, StreamDeckClientConfig cfg, ILogger<StreamDeckDataManager> logger)
+    public StreamDeckDataManager(IFlowDataProvider flow, IFlowControlProvider flowControlProvider, StreamDeckOptions cfg, ILogger<StreamDeckDataManager> logger)
     {
         _flowDataProvider = flow;
         _flowControlProvider = flowControlProvider;
@@ -43,7 +43,7 @@ public sealed class StreamDeckDataManager : IStreamDeckDataManager
     {
         ct.ThrowIfCancellationRequested();
 
-        return await _flowDataProvider.GetTabEventThumbnailAsync(eventId);
+        return await _flowDataProvider.GetTabEventThumbnailAsync(eventId, ct);
     }
 
     public async Task<IReadOnlyList<Tab>> GetTabsAsync(int bankId, CancellationToken ct)

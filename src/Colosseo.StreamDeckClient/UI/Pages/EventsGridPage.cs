@@ -6,6 +6,7 @@ using Colosseo.StreamDeckClient.UI.Navigation;
 using Monogram.Sport.FlowBLL.Enums;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -27,11 +28,9 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
     private readonly int _bankId;
     private readonly int _tabId;
     private readonly string _tabName;
-    private readonly StreamDeckClientConfig _cfg;
+    private readonly StreamDeckOptions _cfg;
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, CacheEntry> _thumbCache = new();
-    private sealed record CacheEntry(Lazy<Task<byte[]>> LazyTask, DateTimeOffset CreatedAt, bool IsNegative);
-    private static readonly TimeSpan NegativeTtl = TimeSpan.FromMinutes(10);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, Task<byte[]>> _thumbCache = new();
 
     private int? _lastEventsHash;
     private int? _lastQuickHash;
@@ -46,7 +45,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         int bankId,
         int tabId,
         string tabName,
-        StreamDeckClientConfig cfg)
+        StreamDeckOptions cfg)
     {
         _data = data;
         _nav = nav;
@@ -61,20 +60,20 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
     // BACK button lives at bottom-left: x=0, y=3 → keyIndex = 3*8+0 = 24
     public override int KeyBack => 24;
 
-    private int StopCol => _cfg.StreamDeckShowStopButtons ? (Columns - 1) : -1;          // 7 or -1
-    private int QuickCol => _cfg.StreamDeckShowQuickTab                                   // 6, 7, or -1
-        ? (_cfg.StreamDeckShowStopButtons ? Columns - 2 : Columns - 1)
+    private int StopCol => _cfg.ShowStopButtons ? (Columns - 1) : -1;          // 7 or -1
+    private int QuickCol => _cfg.ShowQuickTab                                   // 6, 7, or -1
+        ? (_cfg.ShowStopButtons ? Columns - 2 : Columns - 1)
         : -1;
     private int MaxEventCol => Columns - 1                                                // 5, 6, or 7
-        - (_cfg.StreamDeckShowStopButtons ? 1 : 0)
-        - (_cfg.StreamDeckShowQuickTab ? 1 : 0);
+        - (_cfg.ShowStopButtons ? 1 : 0)
+        - (_cfg.ShowQuickTab ? 1 : 0);
 
     // ---- IRefreshablePage ----
 
     public async Task<bool> RefreshAsync(CancellationToken ct)
     {
         var eventsTask = _data.GetTabEventsAsync(_tabId, ct);
-        var quickTask = _cfg.StreamDeckShowQuickTab
+        var quickTask = _cfg.ShowQuickTab
             ? _data.GetQuickTabEventsAsync(_bankId, ct)
             : Task.FromResult<IReadOnlyList<ITabEventBase>>(Array.Empty<ITabEventBase>());
 
@@ -123,7 +122,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
             var slots = new ListItem[Columns * Rows];
 
             // --- stop-action buttons ---
-            if (_cfg.StreamDeckShowStopButtons && StopCol >= 0)
+            if (_cfg.ShowStopButtons && StopCol >= 0)
             {
                 slots[0 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdTop, "HIDE OSD TOP");
                 slots[1 * Columns + StopCol] = MakeStopItem(ListItemKind.StopOsdMiddle, "HIDE OSD MIDDLE");
@@ -132,7 +131,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
             }
 
             // --- quick-tab events (first 4, placed by their PositionY) ---
-            if (_cfg.StreamDeckShowQuickTab && QuickCol >= 0)
+            if (_cfg.ShowQuickTab && QuickCol >= 0)
             {
                 foreach (var qe in quickEvents)
                 {
@@ -194,8 +193,8 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                 try
                 {
                     byte[] thumbBytes = capturedItem.Kind == ListItemKind.EventComposite
-                        ? await FetchCompositeThumbnailBytesAsync(capturedItem.ChildEventIds ?? Array.Empty<int>(), ct).ConfigureAwait(false)
-                        : await GetThumbnailCachedAsync(GetThumbEventId(capturedItem), ct).ConfigureAwait(false);
+                        ? await GetCompositeThumbnailAsync(capturedItem.ChildEventIds ?? Array.Empty<int>()).ConfigureAwait(false)
+                        : await GetThumbnailCachedAsync(GetThumbEventId(capturedItem)).ConfigureAwait(false);
                     var updated = new ListItem(
                     id: capturedItem.Id,
                     title: capturedItem.Title,
@@ -306,6 +305,7 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         {
             badge = comp.TabEvents?.Count ?? 0;
             childIds = comp.TabEvents?.Select(t => t.Id).ToList();
+            Debug.WriteLine($"[Composite] id={e.Id} name={e.Name} childCount={comp.TabEvents?.Count ?? -1} childIds=[{string.Join(",", childIds ?? Array.Empty<int>())}]");
         }
 
         return new ListItem(
@@ -334,47 +334,43 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
 
     // ---- thumbnail cache ----
 
-    private Task<byte[]> GetThumbnailCachedAsync(int thumbEventId, CancellationToken ct)
+    private Task<byte[]> GetThumbnailCachedAsync(int tabEventId)
     {
-        if (_thumbCache.TryGetValue(thumbEventId, out var existing)
-            && existing.IsNegative
-            && (DateTimeOffset.UtcNow - existing.CreatedAt) > NegativeTtl)
+        // If a previously cached task faulted or returned null, evict it so next call retries.
+        if (_thumbCache.TryGetValue(tabEventId, out var existing)
+            && existing.IsCompleted
+            && (existing.IsFaulted || existing.IsCanceled
+                || (existing.IsCompletedSuccessfully && existing.Result == null)))
         {
-            _thumbCache.TryRemove(thumbEventId, out _);
+            _thumbCache.TryRemove(tabEventId, out _);
         }
-
-        var entry = _thumbCache.GetOrAdd(thumbEventId, id =>
-        {
-            var lazy = new Lazy<Task<byte[]>>(() => FetchThumbnailBytesAsync(id), isThreadSafe: true);
-            return new CacheEntry(lazy, DateTimeOffset.UtcNow, IsNegative: false);
-        });
-
-        return AwaitAndMarkNegativeAsync(_thumbCache, thumbEventId, entry, ct);
+        return _thumbCache.GetOrAdd(tabEventId, id => FetchThumbnailBytesAsync(id));
     }
 
-    private async Task<byte[]> AwaitAndMarkNegativeAsync(
-        System.Collections.Concurrent.ConcurrentDictionary<int, CacheEntry> cache,
-        int thumbEventId, CacheEntry entry, CancellationToken ct)
+    private async Task<byte[]> GetCompositeThumbnailAsync(IReadOnlyList<int> childIds)
     {
-        byte[] bytes;
         try
         {
-            bytes = await entry.LazyTask.Value.WaitAsync(ct).ConfigureAwait(false);
+            var ids = childIds.Take(4).ToList();
+            var childBytes = new byte[ids.Count][];
+            for (int i = 0; i < ids.Count; i++)
+            {
+                try
+                {
+                    childBytes[i] = await GetThumbnailCachedAsync(ids[i]).ConfigureAwait(false);
+                    Debug.WriteLine($"[Composite] child id={ids[i]} => {(childBytes[i] == null ? "NULL" : childBytes[i].Length + " bytes")}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[Composite] child id={ids[i]} => EXCEPTION: {ex.Message}");
+                    childBytes[i] = null;
+                }
+            }
+            var result = Rendering.ThumbnailCompositor.Build(childBytes);
+            Debug.WriteLine($"[Composite] Build result => {(result == null ? "NULL" : result.Length + " bytes")}");
+            return result;
         }
-        catch (OperationCanceledException) { throw; }
-        catch { bytes = null; }
-
-        if (bytes == null)
-        {
-            cache.AddOrUpdate(
-                thumbEventId,
-                _ => new CacheEntry(new Lazy<Task<byte[]>>(() => Task.FromResult<byte[]>(null), true),
-                                    DateTimeOffset.UtcNow, IsNegative: true),
-                (_, old) => old.IsNegative ? old
-                            : new CacheEntry(old.LazyTask, DateTimeOffset.UtcNow, IsNegative: true));
-        }
-
-        return bytes;
+        catch (Exception ex) { Debug.WriteLine($"[Composite] outer exception: {ex}"); return null; }
     }
 
     private async Task<byte[]> FetchThumbnailBytesAsync(int thumbEventId)
@@ -382,24 +378,13 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
         try
         {
             await using var s = await _data.GetTabEventThumbnailAsync(thumbEventId, CancellationToken.None).ConfigureAwait(false);
-            if (s == null) return null;
+            if (s == null) { Debug.WriteLine($"[Thumb] id={thumbEventId} => stream NULL"); return null; }
             using var ms = new MemoryStream();
             await s.CopyToAsync(ms, CancellationToken.None).ConfigureAwait(false);
             var bytes = ms.ToArray();
+            Debug.WriteLine($"[Thumb] id={thumbEventId} => {(bytes.Length > 0 ? bytes.Length + " bytes" : "EMPTY array")}");
             return bytes.Length > 0 ? bytes : null;
         }
-        catch { return null; }
-    }
-
-    private async Task<byte[]> FetchCompositeThumbnailBytesAsync(IReadOnlyList<int> childIds, CancellationToken ct)
-    {
-        try
-        {
-            // Fetch up to 4 child thumbnails in parallel (reuse the same cache)
-            var ids = childIds.Take(4).ToList();
-            var childBytes = await Task.WhenAll(ids.Select(id => GetThumbnailCachedAsync(id, ct))).ConfigureAwait(false);
-            return Rendering.ThumbnailCompositor.Build(childBytes);
-        }
-        catch { return null; }
+        catch (Exception ex) { Debug.WriteLine($"[Thumb] id={thumbEventId} => EXCEPTION: {ex.Message}"); return null; }
     }
 }

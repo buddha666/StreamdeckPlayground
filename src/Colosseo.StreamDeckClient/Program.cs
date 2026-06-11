@@ -24,19 +24,19 @@ using var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services =>
     {
       // StreamDeck client configuration
-      services.AddSingleton(new StreamDeckClientConfig
+      services.AddSingleton(new StreamDeckOptions
       {
         FlowSenderIdentifier = "showManager StreamDeck",
         IsInLiveMode = false,
-        StreamDeckModeIsFollowing = false,
-        StreamDeckShowStopButtons = true,
-        StreamDeckShowQuickTab = true,
+        Mode = StreamDeckMode.Independent,
+        ShowStopButtons = true,
+        ShowQuickTab = true,
       });
 
       services.AddSingleton<IODataServiceModelProvider, ODataServiceModelProvider>();
       services.AddTransient<FlowContext>(sp =>
       {
-        var serviceRoot = new Uri("http://service.colosseo.app:45289/"); 
+        var serviceRoot = new Uri("http://service.colosseo.app:45289/");
         var modelProvider = sp.GetRequiredService<IODataServiceModelProvider>();
         return new FlowContext(serviceRoot, modelProvider);
       });
@@ -56,4 +56,4 @@ using var host = Host.CreateDefaultBuilder(args)
     })
     .Build();
 
-    await host.RunAsync();
+await host.RunAsync();
