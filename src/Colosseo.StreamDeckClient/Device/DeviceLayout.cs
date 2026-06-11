@@ -44,7 +44,7 @@ public sealed class DeviceLayout
     public DeviceLayout(int columns, int rows)
     {
         if (columns < 1) throw new ArgumentOutOfRangeException(nameof(columns), "Must be at least 1.");
-        if (rows < 3) throw new ArgumentOutOfRangeException(nameof(rows), "Stream Deck must have at least 3 rows.");
+        if (rows < 3) throw new ArgumentOutOfRangeException(nameof(rows), "Stream Deck must have at least 3 rows to accommodate navigation controls (UP, DOWN, INFO).");
         Columns = columns;
         Rows = rows;
     }
