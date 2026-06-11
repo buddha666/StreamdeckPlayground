@@ -183,31 +183,65 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     using var img = new Image<Rgba32>(KeyWidth, KeyHeight);
 
     bool isBack = text == "BACK";
-    Rgba32 bg, fg, border;
-    if (isBack && enabled)
+    if (isBack)
     {
-      bg = new Rgba32(160, 20, 20);
-      border = new Rgba32(220, 80, 0);
-      fg = new Rgba32(255, 255, 255);
+      // Large left-pointing arrow on black background.
+      // White when navigation is possible; dark-grey when disabled.
+      var arrowColor = enabled ? new Rgba32(255, 255, 255) : new Rgba32(60, 60, 60);
+      img.Mutate(ctx =>
+      {
+        ctx.Fill(new Rgba32(0, 0, 0));
+        DrawBackArrow(ctx, arrowColor);
+      });
     }
     else
     {
-      bg = enabled ? new Rgba32(20, 20, 20) : new Rgba32(5, 5, 5);
-      fg = enabled ? new Rgba32(240, 240, 240) : new Rgba32(80, 80, 80);
-      border = fg;
+      var bg = enabled ? new Rgba32(20, 20, 20) : new Rgba32(5, 5, 5);
+      var fg = enabled ? new Rgba32(240, 240, 240) : new Rgba32(80, 80, 80);
+
+      img.Mutate(ctx =>
+      {
+        ctx.Fill(bg);
+        ctx.DrawInsetBorder(fg, thickness: BorderThickness, inset: BorderInset, width: KeyWidth, height: KeyHeight);
+
+        if (!string.IsNullOrWhiteSpace(text))
+          DrawCenteredText(ctx, text, fg, _titleFont);
+      });
     }
-
-    img.Mutate(ctx =>
-    {
-      ctx.Fill(bg);
-      ctx.DrawInsetBorder(border, thickness: BorderThickness, inset: BorderInset, width: KeyWidth, height: KeyHeight);
-
-      if (!string.IsNullOrWhiteSpace(text))
-        DrawCenteredText(ctx, text, fg, _titleFont);
-    });
 
     Send(keyIndex, img);
     _lastSig[keyIndex] = sig;
+  }
+
+  /// <summary>
+  /// Draws a filled left-pointing arrow centred inside the 96×96 key area.
+  /// The shape is a classic "chunky" arrow: wide triangle head + rectangular shaft.
+  /// </summary>
+  private static void DrawBackArrow(IImageProcessingContext ctx, Rgba32 color)
+  {
+    // Polygon points for a left-pointing arrow (96×96 canvas):
+    //
+    //          ←tip
+    //          14,48
+    //         /      \
+    //       /          50,16  ─── shaft top ───  82,34
+    //      /           50,34                     82,34
+    //      \           50,62                     82,62
+    //       \          50,80  ─── shaft bot ───  82,62
+    //         \      /
+    //          50,80  (bottom of arrowhead)
+    //
+    PointF[] pts =
+    {
+      new PointF(14, 48),   // arrow tip (leftmost point)
+      new PointF(50, 16),   // top of arrowhead
+      new PointF(50, 34),   // inner-top  (head → shaft junction)
+      new PointF(82, 34),   // shaft top-right
+      new PointF(82, 62),   // shaft bottom-right
+      new PointF(50, 62),   // inner-bottom (shaft → head junction)
+      new PointF(50, 80),   // bottom of arrowhead
+    };
+    ctx.FillPolygon(color, pts);
   }
 
   private void RenderEmpty(int keyIndex)
