@@ -49,11 +49,14 @@ public sealed class TabsPage : ScrollableListPage, IRefreshablePage
     // Filter out QuickTab items — they are shown inside EventsGridPage
     var visibleTabs = tabs.Where(t => !t.IsQuick).ToList();
 
-    var hash = HashCode.Combine(
-        visibleTabs.Count,
-        visibleTabs.Count > 0 ? visibleTabs[0].Version : 0,
-        visibleTabs.Count > 0 ? visibleTabs[^1].Version : 0
-    );
+    var hc = new HashCode();
+    foreach (var t in visibleTabs)
+    {
+        hc.Add(t.Id);
+        hc.Add(t.Name);
+        hc.Add(t.Color);
+    }
+    var hash = hc.ToHashCode();
 
     if (_lastHash.HasValue && _lastHash.Value == hash)
       return false;

@@ -119,16 +119,24 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
         var events = await eventsTask;
         var quickEvents = await quickTask;
 
-        var eventsHash = HashCode.Combine(
-            events.Count,
-            events.Count > 0 ? events[0].Id : 0,
-            events.Count > 0 ? events[^1].Id : 0
-        );
-        var quickHash = HashCode.Combine(
-            quickEvents.Count,
-            quickEvents.Count > 0 ? quickEvents[0].Id : 0,
-            quickEvents.Count > 0 ? quickEvents[^1].Id : 0
-        );
+        static int ComputeEventsHash(System.Collections.Generic.IReadOnlyList<ITabEventBase> list)
+        {
+            var h = new HashCode();
+            foreach (var e in list)
+            {
+                h.Add(e.Id);
+                h.Add(e.Name);
+                h.Add(e.Color);
+                h.Add(e.PositionX);
+                h.Add(e.PositionY);
+                if (e is TabEventComposition comp)
+                    h.Add(comp.TabEvents?.Count ?? 0);
+            }
+            return h.ToHashCode();
+        }
+
+        var eventsHash = ComputeEventsHash(events);
+        var quickHash  = ComputeEventsHash(quickEvents);
 
         bool hashChanged = !(
             _lastEventsHash.HasValue && _lastEventsHash.Value == eventsHash &&
@@ -203,6 +211,30 @@ public sealed class FollowingEventsPage : ScrollableListPage, IRefreshablePage
 
             lock (_slots)
             {
+                // Preserve already-loaded thumbnails for items that stayed at the same slot.
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    var fresh    = slots[i];
+                    var existing = _slots[i];
+                    if (fresh != null && fresh.IsThumbnailLoading
+                        && existing != null && !existing.IsThumbnailLoading
+                        && fresh.Id == existing.Id)
+                    {
+                        slots[i] = new ListItem(
+                            id: fresh.Id,
+                            title: fresh.Title,
+                            accentColor: fresh.AccentColor,
+                            badgeCount: fresh.BadgeCount,
+                            kind: fresh.Kind,
+                            thumbnailBytes: existing.ThumbnailBytes,
+                            isThumbnailLoading: false,
+                            isQuickTab: fresh.IsQuickTab,
+                            positionX: fresh.PositionX,
+                            positionY: fresh.PositionY,
+                            childEventIds: fresh.ChildEventIds
+                        );
+                    }
+                }
                 Array.Copy(slots, _slots, slots.Length);
             }
             InvalidateAll();

@@ -42,11 +42,14 @@ public sealed class BanksPage : ScrollableListPage, IRefreshablePage
   {
     var banks = await _data.GetBanksAsync(ct);
 
-    var hash = HashCode.Combine(
-        banks.Count,
-        banks.Count > 0 ? banks[0].Version : 0,
-        banks.Count > 0 ? banks[^1].Version : 0
-    );
+    var hc = new HashCode();
+    foreach (var b in banks)
+    {
+        hc.Add(b.Id);
+        hc.Add(b.Name);
+        hc.Add(b.Color);
+    }
+    var hash = hc.ToHashCode();
 
     if (_lastHash.HasValue && _lastHash.Value == hash)
       return false;
