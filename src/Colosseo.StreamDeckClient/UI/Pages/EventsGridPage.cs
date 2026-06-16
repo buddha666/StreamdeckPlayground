@@ -124,7 +124,42 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                     s.Kind is ListItemKind.EventSingle or ListItemKind.EventComposite);
             }
             if (!anyStillLoading)
-                return false;
+            {
+                // Defensive: even when the hash reports no change, do a targeted scan for
+                // metadata (title, colour) that the hash may have missed.  This covers edge
+                // cases where a composite event's Name is returned as null or a stale cached
+                // value by the OData layer during incremental polls.
+                var dirtyKis = new List<int>();
+                lock (_slots)
+                {
+                    foreach (var e in events)
+                    {
+                        int x = e.PositionY;  // BuildEventItem swaps X/Y
+                        int y = e.PositionX;
+                        if (x < 0 || x > MaxEventCol || y < 0 || y >= Rows) continue;
+                        int ki = y * Columns + x;
+                        if (ki == KeyBack || ki < 0 || ki >= _slots.Length) continue;
+                        AppendIfStaleMeta(e, ki, dirtyKis);
+                    }
+
+                    if (_cfg.ShowQuickTab && QuickCol >= 0)
+                    {
+                        foreach (var qe in quickEvents)
+                        {
+                            int row = qe.PositionX;  // after X/Y swap: item.PositionY = e.PositionX
+                            if (row < 0 || row >= Rows) continue;
+                            int ki = row * Columns + QuickCol;
+                            if (ki < 0 || ki >= _slots.Length) continue;
+                            AppendIfStaleMeta(qe, ki, dirtyKis);
+                        }
+                    }
+                }
+                if (dirtyKis.Count == 0)
+                    return false;
+                foreach (var ki in dirtyKis)
+                    MarkKeyDirty(ki);
+                return true;
+            }
         }
         else
         {
@@ -379,6 +414,39 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
             positionY: e.PositionX,
             childEventIds: childIds
         );
+    }
+
+    /// <summary>
+    /// Must be called while <see cref="_slots"/> is locked.
+    /// Checks whether the slot at <paramref name="ki"/> holds the same event as
+    /// <paramref name="e"/> but with a stale title or colour; if so, updates the
+    /// slot in-place and records <paramref name="ki"/> in <paramref name="dirtyKis"/>.
+    /// </summary>
+    private void AppendIfStaleMeta(ITabEventBase e, int ki, List<int> dirtyKis)
+    {
+        var slot = _slots[ki];
+        if (slot == null || slot.IsThumbnailLoading) return;
+
+        var expectedId = (e is TabEventComposition ? "C:" : "S:") + e.Id;
+        if (slot.Id != expectedId) return;
+
+        var newColor = ColorUtil.FromFlowColor(e.Color, Color.Black);
+        if (slot.Title == e.Name && slot.AccentColor == newColor) return;
+
+        _slots[ki] = new ListItem(
+            id: slot.Id,
+            title: e.Name,
+            accentColor: newColor,
+            badgeCount: slot.BadgeCount,
+            kind: slot.Kind,
+            thumbnailBytes: slot.ThumbnailBytes,
+            isThumbnailLoading: false,
+            isQuickTab: slot.IsQuickTab,
+            positionX: slot.PositionX,
+            positionY: slot.PositionY,
+            childEventIds: slot.ChildEventIds
+        );
+        dirtyKis.Add(ki);
     }
 
     private static int GetThumbEventId(ListItem item)
