@@ -2,9 +2,11 @@
 
 public sealed class StreamDeckOptions
 {
+  public bool Enabled { get; set; } = false;
+
   public string FlowSenderIdentifier { get; init; } = "showManager StreamDeck";
 
-  public bool IsInLiveMode { get; init; } = false;
+  public bool IsInLiveMode { get; init; } = true;
 
   /// <summary>When true the "following" mode layout is used: events are shown directly
   /// for the tab selected via <see cref="Colosseo.StreamDeckClient.Data.ISelectedTabProvider"/>

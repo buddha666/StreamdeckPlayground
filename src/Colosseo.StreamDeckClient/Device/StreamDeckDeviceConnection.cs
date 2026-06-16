@@ -54,7 +54,7 @@ public sealed class StreamDeckDeviceConnection : IStreamDeckDeviceConnection
     }
 
     Columns = xSet.Count > 0 ? xSet.Count : 8;
-    Rows    = ySet.Count  > 0 ? ySet.Count  : 4;
+    Rows = ySet.Count  > 0 ? ySet.Count  : 4;
 
     _logger.LogInformation("Connected. Keys={KeyCount}, Grid={Cols}×{Rows}", KeyCount, Columns, Rows);
 

@@ -213,24 +213,8 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
     _lastSig[keyIndex] = sig;
   }
 
-  /// <summary>
-  /// Draws a filled left-pointing arrow centred inside the 96×96 key area.
-  /// The shape is a classic "chunky" arrow: wide triangle head + rectangular shaft.
-  /// </summary>
   private static void DrawBackArrow(IImageProcessingContext ctx, Rgba32 color)
   {
-    // Polygon points for a left-pointing arrow (96×96 canvas):
-    //
-    //          ←tip
-    //          14,48
-    //         /      \
-    //       /          50,16  ─── shaft top ───  82,34
-    //      /           50,34                     82,34
-    //      \           50,62                     82,62
-    //       \          50,80  ─── shaft bot ───  82,62
-    //         \      /
-    //          50,80  (bottom of arrowhead)
-    //
     PointF[] pts =
     {
       new PointF(14, 48),   // arrow tip (leftmost point)
