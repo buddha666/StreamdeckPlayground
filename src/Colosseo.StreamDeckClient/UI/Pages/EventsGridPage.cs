@@ -240,21 +240,30 @@ public sealed class EventsGridPage : ScrollableListPage, IRefreshablePage
                     byte[] thumbBytes = capturedItem.Kind == ListItemKind.EventComposite
                         ? await GetCompositeThumbnailAsync(capturedItem.ChildEventIds ?? Array.Empty<int>()).ConfigureAwait(false)
                         : await GetThumbnailCachedAsync(GetThumbEventId(capturedItem)).ConfigureAwait(false);
-                    var updated = new ListItem(
-                    id: capturedItem.Id,
-                    title: capturedItem.Title,
-                    accentColor: capturedItem.AccentColor,
-                    badgeCount: capturedItem.BadgeCount,
-                    kind: capturedItem.Kind,
-                    thumbnailBytes: thumbBytes is { Length: > 0 } ? thumbBytes : null,
-                    isThumbnailLoading: false,
-                    isQuickTab: capturedItem.IsQuickTab,
-                    positionX: capturedItem.PositionX,
-                    positionY: capturedItem.PositionY,
-                    childEventIds: capturedItem.ChildEventIds
-                );
 
-                    lock (_slots) { _slots[capturedKi] = updated; }
+                    // Read the CURRENT slot state inside the lock so we never write back
+                    // stale metadata (title / color / position) that may have been updated
+                    // by a newer RefreshAsync cycle while the thumbnail was being fetched.
+                    lock (_slots)
+                    {
+                        var current = _slots[capturedKi];
+                        if (current != null && current.Id == capturedItem.Id)
+                        {
+                            _slots[capturedKi] = new ListItem(
+                                id: current.Id,
+                                title: current.Title,
+                                accentColor: current.AccentColor,
+                                badgeCount: current.BadgeCount,
+                                kind: current.Kind,
+                                thumbnailBytes: thumbBytes is { Length: > 0 } ? thumbBytes : null,
+                                isThumbnailLoading: false,
+                                isQuickTab: current.IsQuickTab,
+                                positionX: current.PositionX,
+                                positionY: current.PositionY,
+                                childEventIds: current.ChildEventIds
+                            );
+                        }
+                    }
                     MarkKeyDirty(capturedKi);
                 }
                 catch

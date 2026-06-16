@@ -345,8 +345,8 @@ public sealed class ImageSharpStreamDeckRenderer : IStreamDeckRenderer
 
     img.Mutate(ctx =>
     {
-      // Outer frame: white for composite events, accent colour for single events.
-      ctx.Fill(isComposite ? new Rgba32(255, 255, 255, 255) : frameColor);
+      // Outer frame: accent colour for all event types.
+      ctx.Fill(frameColor);
       // Black inner area (same for both variants).
       ctx.Fill(new Rgba32(0, 0, 0, 255), inner);
 
